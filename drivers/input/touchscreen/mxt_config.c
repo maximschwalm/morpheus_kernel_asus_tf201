@@ -603,4 +603,56 @@ mxt_boot_exit:
     return 0;  
 }
 
+int mxt_update_fw(struct i2c_client *client, unsigned short bl_address, unsigned char *firmware_data, unsigned int firmware_size){
+    int ret, retry = 0;
+    unsigned int pos = 0;
+    unsigned int frame_size = 0;
+    unsigned short orig_addr;
 
+mxt_boot_start:
+    dev_info(&client->dev,"Change I2C address from 0x%02X to 0x%02X\n",
+			client->addr, bl_address);
+    orig_addr = client->addr;
+    client->addr = bl_address;  
+    
+    ret = mxt_check_boot_status(client,  MXT_WAITING_BOOTLOAD_COMMAND);
+    if(ret < 0){
+        dev_info(&client->dev, "Error to get into state MXT_WAITING_BOOTLOAD_COMMAND\n");
+        goto mxt_boot_exit;
+    }
+    /*unlock the bootloader*/
+    ret = mxt_unlock_bootloader(client);
+    while(pos < firmware_size){
+        retry = 10;
+        ret = mxt_check_boot_status(client, MXT_WAITING_FRAME_DATA);
+        if (ret < 0){
+            dev_err(&client->dev, "Error to get into state: MXT_WAITING_FRAME_DATA\n");
+            goto mxt_boot_exit;
+        }
+			
+        frame_size = ((*(firmware_data + pos) << 8) | *(firmware_data + pos + 1));
+        /* We should add 2 at frame size as the the firmware data is not
+        * included the CRC bytes.*/
+        frame_size += 2;
+mxt_send_boot_frame:
+        /* Write one frame to device */
+        i2c_master_send(client, (unsigned char *)(firmware_data + pos), frame_size);
+        ret = mxt_check_boot_status(client, MXT_FRAME_CRC_PASS);
+        if (ret < 0){
+            if(retry-- > 0){
+                dev_info(&client->dev, "#########Try send frame again!\n ");
+                goto mxt_send_boot_frame;
+            }
+            goto mxt_boot_exit;
+	  }
+			
+         pos += frame_size;
+         dev_info(&client->dev, "Updated %d bytes / %zd bytes\n", pos, firmware_size);		
+    }
+    msleep(1000);
+mxt_boot_exit: 
+    dev_info(&client->dev,"Change I2C address from 0x%02X to 0x%02X\n", bl_address, orig_addr);
+    client->addr = orig_addr;  
+		
+    dev_info(&client->dev, "QT_Boot end\n");
+}

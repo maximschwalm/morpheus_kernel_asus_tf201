@@ -36,9 +36,9 @@ snd-soc-tegra-rt5642-objs := tegra_rt5640.o
 snd-soc-tegra-max98095-objs := tegra_max98095.o
 snd-soc-tegra-vcm-objs := tegra_vcm.o
 
+obj-$(CONFIG_SND_SOC_TEGRA_RT5642) += snd-soc-tegra-rt5642.o
 obj-$(CONFIG_SND_SOC_TEGRA_RT5631) += snd-soc-tegra-rt5631.o
 obj-$(CONFIG_SND_SOC_TEGRA_RT5640) += snd-soc-tegra-rt5640.o
-obj-$(CONFIG_SND_SOC_TEGRA_RT5642) += snd-soc-tegra-rt5642.o
 obj-$(CONFIG_SND_SOC_TEGRA_WM8903) += snd-soc-tegra-wm8903.o
 obj-$(CONFIG_SND_SOC_TEGRA_TRIMSLICE) += snd-soc-tegra-trimslice.o
 obj-$(CONFIG_SND_SOC_TEGRA_WM8753) += snd-soc-tegra-wm8753.o

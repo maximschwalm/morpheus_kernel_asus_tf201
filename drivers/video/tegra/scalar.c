@@ -172,9 +172,11 @@ static int exit_isp_mode()
         scalar_update_status = -1;
         return err;
     }
-    gpio_set_value(EN_VDD_BL, 0);
+    //Chris_Lin disable GPIO control
+    //gpio_set_value(EN_VDD_BL, 0);
     msleep(2000);
-    gpio_set_value(EN_VDD_BL, 1);
+    //Chris_Lin disable GPIO control
+    //gpio_set_value(EN_VDD_BL, 1);
     scalar_update_status = 1;
     printk("%s-\n", __func__);
     return 0;

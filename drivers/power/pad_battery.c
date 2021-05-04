@@ -39,9 +39,7 @@
 #include <mach/board-cardhu-misc.h>
 #include <linux/delay.h>
 #define SMBUS_RETRY                                     (3)
-#define BAT_IN_DET                                        TEGRA_GPIO_PN4
-#define GPIOPIN_BATTERY_DETECT	         BAT_IN_DET
-#define GPIOPIN_LOW_BATTERY_DETECT	  TEGRA_GPIO_PS4
+#define dock_in_gpio	                 TEGRA_GPIO_PU4
 #define BATTERY_POLLING_RATE                    (120)
 #define DELAY_FOR_CORRECT_CHARGER_STATUS	(4)
 #define DELAY_FOR_CORRECT_CHARGER_STATUS_P1801	(6)
@@ -59,13 +57,28 @@ unsigned battery_docking_status=0;
 unsigned battery_driver_ready=0;
 static int ac_on ;
 static int usb_on ;
-extern int asuspec_battery_monitor(char *cmd);
+extern int asuspec_battery_monitor(char *cmd, bool pad);
 static unsigned int 	battery_current;
 static unsigned int  battery_remaining_capacity;
 module_param(battery_current, uint, 0644);
 module_param(battery_remaining_capacity, uint, 0644);
+//[Brook- Docking charging porting]>>
+static int dock_battery_get_property(struct power_supply *psy,enum power_supply_property psp,union power_supply_propval *val);
+extern unsigned int Check_Charging_Cable_Type();
+static int dock_get_psp(int reg_offset, enum power_supply_property psp,union power_supply_propval *val, int battery_type);
+static int dock_get_capacity(union power_supply_propval *val);
+static int dock_get_status(union power_supply_propval *val);
+extern bool Check_Charging_status(bool pad);
+extern bool Check_Battery_status(void);
+extern bool Check_BAT_LL_Enabled(void);
+extern bool asuspec_check_dock_in_control_flag(void);
+typedef enum {
+	dock_battery_type = 0,
+	pad_battery_type,
+}battery_type;
+//[Brook- Docking charging porting]<<
 enum {
-       REG_MANUFACTURER_DATA,  	
+	REG_MANUFACTURER_DATA,  	
 	REG_STATE_OF_HEALTH,
 	REG_TEMPERATURE,
 	REG_VOLTAGE,
@@ -82,6 +95,7 @@ typedef enum {
 	Charger_Type_AC,
 	Charger_Type_USB,
 	Charger_Type_Docking_AC,
+	Charger_Type_Docking_Battery,
 	Charger_Type_Num,
 	Charger_Type_Force32 = 0x7FFFFFFF
 } Charger_Type;
@@ -94,7 +108,7 @@ typedef enum {
 #define MANUFACTURER_ACCESS_SLEEP	0x0011
 
 /* battery status value bits */
-#define BATTERY_CHARGING 		0x40
+#define BATTERY_CHARGING 		    0x40
 #define BATTERY_FULL_CHARGED		0x20
 #define BATTERY_FULL_DISCHARGED 	0x10
 #define PAD_BAT_DATA(_psp, _addr, _min_value, _max_value)	\
@@ -111,8 +125,8 @@ static struct pad_device_data {
 	int min_value;
 	int max_value;
 } pad_data[] = {
-       [REG_MANUFACTURER_DATA]= PAD_BAT_DATA(PRESENT, 0, 0, 65535),
-       [REG_STATE_OF_HEALTH]= PAD_BAT_DATA(HEALTH, 0, 0, 65535),
+	[REG_MANUFACTURER_DATA] = PAD_BAT_DATA(PRESENT, 0, 0, 65535),
+	[REG_STATE_OF_HEALTH]   = PAD_BAT_DATA(HEALTH, 0, 0, 65535),
 	[REG_TEMPERATURE]       = PAD_BAT_DATA(TEMP, 0x08, 0, 65535),
 	[REG_VOLTAGE]           = PAD_BAT_DATA(VOLTAGE_NOW, 0x09, 0, 20000),
 	[REG_CURRENT]           = PAD_BAT_DATA(CURRENT_NOW, 0x0A, -32768, 32767),
@@ -123,122 +137,14 @@ static struct pad_device_data {
 	[REG_SERIAL_NUMBER]     = PAD_BAT_DATA(SERIAL_NUMBER, 0x1C, 0, 65535),
 };
 
-static enum power_supply_property pad_properties[] = {
-	POWER_SUPPLY_PROP_STATUS,
-	POWER_SUPPLY_PROP_HEALTH,
-	POWER_SUPPLY_PROP_PRESENT,
-	POWER_SUPPLY_PROP_TECHNOLOGY,
-	POWER_SUPPLY_PROP_VOLTAGE_NOW,
-	POWER_SUPPLY_PROP_CAPACITY,
-	POWER_SUPPLY_PROP_TEMP,
-
-};
-
-unsigned (*get_usb_cable_status_cb) (void);
-
-void check_cabe_type(void)
-{
-      if(battery_cable_status == USB_AC_Adapter){
-		 ac_on = 1 ;
-	        usb_on = 0;
-	}
-	else if(battery_cable_status  == USB_Cable){
-		usb_on = 1;
-		/* if(battery_docking_status)
-			ac_on = 1;
-		 else*/
-			ac_on = 0;
-	}
-	/*else if(battery_docking_status){
-		 ac_on = 1 ;
-	        usb_on = 0;
-	}*/
-	else{
-		ac_on = 0 ;
-		usb_on = 0;
-	}
-}
-static int pad_get_property(struct power_supply *psy,
-	enum power_supply_property psp, union power_supply_propval *val);
-
-static enum power_supply_property power_properties[] = {
-	POWER_SUPPLY_PROP_ONLINE,
-};
-
-static int pad_get_psp(int reg_offset, enum power_supply_property psp,union power_supply_propval *val);
-
-static int power_get_property(struct power_supply *psy,
-	enum power_supply_property psp, union power_supply_propval *val)
-{
-	int ret=0;
-	switch (psp) {
-
-	case POWER_SUPPLY_PROP_ONLINE:
-		   if(psy->type == POWER_SUPPLY_TYPE_MAINS &&  ac_on )
-		   	val->intval =  1;
-		   else if (psy->type == POWER_SUPPLY_TYPE_USB && usb_on)
-			val->intval =  1;
-		   else if (psy->type == POWER_SUPPLY_TYPE_DOCK_AC&& battery_docking_status)
-			val->intval =  1;
-		   else 
-		   	val->intval = 0;
-		break;
-
-	default:
-		return -EINVAL;
-	}
-	return ret;
-}
-
-static char *supply_list[] = {
-	"battery",
-	"ac",
-	"usb",
-};
-
-static struct power_supply pad_supply[] = {
-	{
-	.name		= "battery",
-	.type		= POWER_SUPPLY_TYPE_BATTERY,
-	.properties	= pad_properties,
-	.num_properties	= ARRAY_SIZE(pad_properties),
-	.get_property	= pad_get_property,
-       },
-	{
-		.name                   = "ac",
-		.type                     = POWER_SUPPLY_TYPE_MAINS,
-		.supplied_to = supply_list,
-		.num_supplicants = ARRAY_SIZE(supply_list),
-		.properties = power_properties,
-		.num_properties = ARRAY_SIZE(power_properties),
-		.get_property =power_get_property,
-	},
-	{
-		.name                    = "usb",
-		.type                      = POWER_SUPPLY_TYPE_USB,
-		.supplied_to = supply_list,
-		.num_supplicants = ARRAY_SIZE(supply_list),
-		.properties =power_properties,
-		.num_properties = ARRAY_SIZE(power_properties),
-		.get_property =power_get_property,
-	},
-	{
-		.name                    = "docking_ac",
-		.type                      = POWER_SUPPLY_TYPE_DOCK_AC,
-		.properties =power_properties,
-		.num_properties = ARRAY_SIZE(power_properties),
-		.get_property =power_get_property,
-	},
-};
-
 static struct pad_device_info {
 	struct i2c_client	*client;
         struct delayed_work battery_stress_test;
 	struct delayed_work thermal_stress_test;
 	struct delayed_work pmu_stress_test;
 	struct delayed_work status_poll_work;
+	struct delayed_work dock_status_poll_work;
 	struct delayed_work low_low_bat_work;
-	struct timer_list charger_pad_dock_detect_timer ;
 	int smbus_status;
 	int battery_present;
 	int low_battery_present;
@@ -261,8 +167,133 @@ static struct pad_device_info {
 	int bat_vol;
 	int bat_current;
 	int bat_capacity;
+//[Brook- Docking charging porting]>>
+	int gpio_dock_detect;
+	int dock_bat_status;
+	bool dock_in;
+	int dock_bat_capacity;
+	unsigned int dock_old_capacity;
+	unsigned int dock_cap_err;
+//[Brook- Docking charging porting]<<
 } *pad_device;
-	
+
+static enum power_supply_property pad_properties[] = {
+	POWER_SUPPLY_PROP_STATUS,
+	POWER_SUPPLY_PROP_HEALTH,
+	POWER_SUPPLY_PROP_PRESENT,
+	POWER_SUPPLY_PROP_TECHNOLOGY,
+	POWER_SUPPLY_PROP_VOLTAGE_NOW,
+	POWER_SUPPLY_PROP_CAPACITY,
+	POWER_SUPPLY_PROP_TEMP,
+
+};
+
+unsigned (*get_usb_cable_status_cb) (void);
+
+void check_cabe_type(void)
+{
+	if(battery_cable_status == USB_AC_Adapter){
+		ac_on = 1 ;
+		usb_on = 0;
+	}else if(battery_cable_status  == USB_Cable){
+		usb_on = 1;
+		ac_on = 0;
+	}else if(battery_cable_status  == USB_NO_Cable){
+		ac_on = 0 ;
+		usb_on = 0;
+	}
+}
+static int pad_get_property(struct power_supply *psy,
+	enum power_supply_property psp, union power_supply_propval *val);
+
+static enum power_supply_property power_properties[] = {
+	POWER_SUPPLY_PROP_ONLINE,
+};
+
+static int pad_get_psp(int reg_offset, enum power_supply_property psp,union power_supply_propval *val, int battery_type);
+
+static int power_get_property(struct power_supply *psy,
+	enum power_supply_property psp, union power_supply_propval *val)
+{
+	int ret=0;
+	switch (psp) {
+
+	case POWER_SUPPLY_PROP_ONLINE:
+		   if(psy->type == POWER_SUPPLY_TYPE_MAINS && ac_on){
+		   	val->intval =  1;
+		   }
+		   else if (psy->type == POWER_SUPPLY_TYPE_USB && usb_on){
+			val->intval =  1;
+		   }
+		   else if (psy->type == POWER_SUPPLY_TYPE_DOCK_AC && ac_on && pad_device->dock_in){
+			val->intval =  1;
+		   }
+		   else{ 
+		   	val->intval = 0;
+		   }
+		break;
+
+	default:
+		return -EINVAL;
+	}
+	return ret;
+}
+
+static char *supply_list[] = {
+	"battery",
+	"ac",
+	"usb",
+};
+
+//[Brook- Docking charging porting]>>
+static enum power_supply_property dock_battery_properties[] = {
+	POWER_SUPPLY_PROP_STATUS,
+	POWER_SUPPLY_PROP_CAPACITY,
+};
+//[Brook- Docking charging porting]<<
+
+static struct power_supply pad_supply[] = {
+	{
+		.name             = "battery",
+		.type             = POWER_SUPPLY_TYPE_BATTERY,
+		.properties       = pad_properties,
+		.num_properties   = ARRAY_SIZE(pad_properties),
+		.get_property     = pad_get_property,
+       },
+	{
+		.name             = "ac",
+		.type             = POWER_SUPPLY_TYPE_MAINS,
+		.supplied_to      = supply_list,
+		.num_supplicants  = ARRAY_SIZE(supply_list),
+		.properties       = power_properties,
+		.num_properties   = ARRAY_SIZE(power_properties),
+		.get_property     = power_get_property,
+	},
+	{
+		.name             = "usb",
+		.type             = POWER_SUPPLY_TYPE_USB,
+		.supplied_to      = supply_list,
+		.num_supplicants  = ARRAY_SIZE(supply_list),
+		.properties       = power_properties,
+		.num_properties   = ARRAY_SIZE(power_properties),
+		.get_property     = power_get_property,
+	},
+	{
+		.name             = "docking_ac",
+		.type             = POWER_SUPPLY_TYPE_DOCK_AC,
+		.properties       = power_properties,
+		.num_properties   = ARRAY_SIZE(power_properties),
+		.get_property     = power_get_property,
+	},
+	{
+		.name             = "dock_battery",
+		.type             = POWER_SUPPLY_TYPE_DOCK_BATTERY,
+		.properties       = dock_battery_properties,
+		.num_properties   = ARRAY_SIZE(dock_battery_properties),
+		.get_property	  = dock_battery_get_property,
+	},
+};
+
 void  register_usb_cable_status_cb(unsigned  (*fn) (void))
 {
 	if (!get_usb_cable_status_cb)
@@ -333,6 +364,7 @@ int pad_smbus_write_data(int reg_offset,int byte, unsigned int value)
       return ret;
 }
 struct workqueue_struct *battery_work_queue=NULL;
+struct workqueue_struct *dock_battery_work_queue=NULL;
 static ssize_t show_battery_smbus_status(struct device *dev, struct device_attribute *devattr, char *buf)
 {
 	int status=!pad_device->smbus_status;
@@ -351,55 +383,58 @@ static const struct attribute_group battery_smbus_group = {
 static void battery_status_poll(struct work_struct *work)
 {
        struct pad_device_info *battery_device =container_of(work, struct pad_device_info,status_poll_work.work);
-	  //printk("battery_status_poll\n");
+	//printk("battery_status_poll\n");
 	//kobject_uevent(&pad_supply.dev->kobj, KOBJ_CHANGE);
 	if(!battery_driver_ready)
 		printk("battery_status_poll:driver not ready\n");
 	power_supply_changed(&pad_supply[Charger_Type_Battery]);
 	/* Schedule next poll */
-       pad_device->battery_present =!(gpio_get_value(pad_device->gpio_battery_detect));
+	pad_device->battery_present = Check_Battery_status();
 	printk("battery_status_poll %u %u \n",BATTERY_POLLING_RATE,pad_device->battery_present);
 	if(pad_device->battery_present)
 		queue_delayed_work(battery_work_queue, &battery_device->status_poll_work,BATTERY_POLLING_RATE*HZ);
 }
 
+#if 0
 static irqreturn_t battery_detect_isr(int irq, void *dev_id)
 {
-	pad_device->battery_present =!(gpio_get_value(pad_device->gpio_battery_detect));
+	pad_device->battery_present =Check_Battery_status();
 	printk("battery_detect_isr battery %s \n",pad_device->battery_present?"instered":"removed" );
 	if( pad_device->battery_present)
 		queue_delayed_work(battery_work_queue, &pad_device->status_poll_work, BATTERY_POLLING_RATE*HZ);
 	return IRQ_HANDLED;
 }
+#endif
 static void low_low_battery_check(struct work_struct *work)
 {
-       cancel_delayed_work(&pad_device->status_poll_work);
+	cancel_delayed_work(&pad_device->status_poll_work);
 	queue_delayed_work(battery_work_queue,&pad_device->status_poll_work,0.1*HZ);
 	msleep(2000);
-	enable_irq(pad_device->irq_low_battery_detect );
+	//enable_irq(pad_device->irq_low_battery_detect );
 }
-static irqreturn_t low_battery_detect_isr(int irq, void *dev_id)
+
+void low_battery_detect_isr()
 {
-	disable_irq_nosync(pad_device->irq_low_battery_detect );
-	pad_device->low_battery_present=gpio_get_value(pad_device->gpio_low_battery_detect);
-	printk("low_battery_detect_isr battery is %x\n",pad_device->low_battery_present );
+	//disable_irq_nosync(pad_device->irq_low_battery_detect );
+	pad_device->low_battery_present=Check_BAT_LL_Enabled();
+	printk("low_battery_detect_isr is %x\n",pad_device->low_battery_present?"enable":"disable");
 	wake_lock_timeout(&pad_device->low_battery_wake_lock, 10*HZ);
 	queue_delayed_work(battery_work_queue,&pad_device->low_low_bat_work,0.1*HZ);
-	return IRQ_HANDLED;
+	return 0;
 }
+#if 0
 void setup_detect_irq(void )
 {
        s32 ret=0;
 	
 	pad_device->battery_present=0;
 	pad_device->low_battery_present=0;
-       ret = gpio_request(pad_device->gpio_battery_detect, "battery_detect");
+	ret = gpio_request(pad_device->gpio_battery_detect, "battery_detect");
 	if (ret < 0) {
 		printk("request battery_detect gpio failed\n");
 		pad_device->gpio_battery_detect = -1;
 		goto setup_low_bat_irq;
 	}
-	
 	pad_device->irq_battery_detect = gpio_to_irq(pad_device->gpio_battery_detect);
 	if (pad_device->irq_battery_detect < 0) {
 		printk("invalid battery_detect GPIO\n");
@@ -417,9 +452,9 @@ void setup_detect_irq(void )
 	ret = request_irq(pad_device->irq_battery_detect , battery_detect_isr,
 			IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,"pad-battery (detect)", NULL);
 	if (ret < 0) {
-            printk("failed to request  battery_detect irq\n");
+		printk("failed to request  battery_detect irq\n");
 	}
-	 pad_device->battery_present=!(gpio_get_value(pad_device->gpio_battery_detect));
+	pad_device->battery_present=!(gpio_get_value(pad_device->gpio_battery_detect));
 	printk("setup_irq: battery_present =%x   \n",pad_device->battery_present);
 setup_low_bat_irq:
  	
@@ -459,134 +494,65 @@ void setup_low_battery_irq(void )
             printk("failed to request  low_battery_detect irq\n");
 	}
 	enable_irq_wake(pad_device->irq_low_battery_detect );
-printk("setup_low_battery_irq:low_battery_present=%x \n",pad_device->low_battery_present);
+	printk("setup_low_battery_irq:low_battery_present=%x \n",pad_device->low_battery_present);
 exit:
 	return;
 }
-void battery_callback(unsigned usb_cable_state)
-{
-	u32 project_info = tegra3_get_project_id();
-
-      int old_cable_status=battery_cable_status;
-       printk("========================================================\n") ;
-	printk("battery_callback  usb_cable_state =%x\n",usb_cable_state ) ;
-       printk("========================================================\n") ;
-      battery_cable_status = usb_cable_state ;
-	if(!battery_driver_ready){
-		printk("battery_callback battery driver not ready\n") ;
-		return;
-	}
+#endif
+void cable_status_callback(unsigned usb_cable_state){
+	pad_device->dock_in =!(gpio_get_value(pad_device->gpio_dock_detect));
+	battery_cable_status = usb_cable_state;
 	check_cabe_type();
-
-	if(project_info == TEGRA3_PROJECT_P1801)
-	{
-		wake_lock_timeout(&pad_device->cable_event_wake_lock, DELAY_FOR_CORRECT_CHARGER_STATUS_P1801 * HZ);
-	}
-	else
-	{
-		wake_lock_timeout(&pad_device->cable_event_wake_lock, DELAY_FOR_CORRECT_CHARGER_STATUS * HZ);
-	}
-
-	if(! battery_cable_status){
-		if ( old_cable_status == USB_AC_Adapter){
-			power_supply_changed(&pad_supply[Charger_Type_AC]);
-		}
-		else if ( old_cable_status == USB_Cable){
-			power_supply_changed(&pad_supply[Charger_Type_USB]);
-		}
-	}else if ( battery_cable_status == USB_Cable){
+	if (battery_cable_status == USB_Cable){
 		power_supply_changed(&pad_supply[Charger_Type_USB]);
-	}else if ( battery_cable_status == USB_AC_Adapter){
+	}else if (battery_cable_status == USB_AC_Adapter){
 		power_supply_changed(&pad_supply[Charger_Type_AC]);
-	}
-	cancel_delayed_work(&pad_device->status_poll_work);
-
-	if(project_info == TEGRA3_PROJECT_P1801)
-	{
-		queue_delayed_work(battery_work_queue, &pad_device->status_poll_work,4*HZ);
-	}
-	else
-	{
-		queue_delayed_work(battery_work_queue, &pad_device->status_poll_work,2*HZ);
-	}
-}
-static irqreturn_t charger_pad_dock_interrupt(int irq, void *dev_id)
-{
-	printk(KERN_INFO"charger_pad_dock_interrupt\n");
-	mod_timer(&pad_device->charger_pad_dock_detect_timer,jiffies +(5*HZ));
-	return IRQ_HANDLED;
-}
-static int docking_status=0;
-static void charger_pad_dock_detection(unsigned long unused)
-{
-	int dock_in_value = 0;
-	int charger_pad_dock_value = 0;
-
-	dock_in_value = gpio_get_value(TEGRA_GPIO_PU4);
-	charger_pad_dock_value = gpio_get_value(TEGRA_GPIO_PS5);
-	printk(KERN_INFO"charger_pad_dock_detection:%u dock_in_value=%u  charger_pad_dock_value =%u\n",
-		pad_device->dock_charger_pad_interrupt_enabled,dock_in_value,charger_pad_dock_value );
-
-	if(docking_status && dock_in_value == 0 && charger_pad_dock_value ==0){
-		battery_docking_status=true;
-	}else{
-		battery_docking_status=false;
-	}
-
-	check_cabe_type();
-	power_supply_changed(&pad_supply[Charger_Type_Docking_AC]);
-	if(battery_driver_ready){
-		 cancel_delayed_work(&pad_device->status_poll_work);
-		 queue_delayed_work(battery_work_queue, &pad_device->status_poll_work,0.2*HZ);
-	}
-
-}
-
-int docking_callback(int docking_in )
-{
-	if(!battery_driver_ready)
-		return -1;
-       printk("========================================================\n") ;
-	printk("docking_callback %u  docking_in =%u pu4=%x \n",pad_device->dock_charger_pad_interrupt_enabled,docking_in ,gpio_get_value(TEGRA_GPIO_PU4));
-       printk("========================================================\n") ;
-	docking_status=docking_in;
-
-	if( docking_status ){
-		if(!pad_device->dock_charger_pad_interrupt_enabled){
-			enable_irq(gpio_to_irq(TEGRA_GPIO_PS5));
-			pad_device->dock_charger_pad_interrupt_enabled=true;
-			printk("enable_irq(gpio_to_irq(TEGRA_GPIO_PS5)\n") ;
-		}
-	}else if(pad_device->dock_charger_pad_interrupt_enabled){
-		disable_irq(gpio_to_irq(TEGRA_GPIO_PS5));
-		pad_device->dock_charger_pad_interrupt_enabled=false;
-		printk("disable_irq(gpio_to_irq(TEGRA_GPIO_PS5)\n") ;
-	}
-
-	if(battery_driver_ready){
-		cancel_delayed_work_sync(&pad_device->status_poll_work);
-		power_supply_changed(&pad_supply[Charger_Type_Battery]);
-		 mod_timer(&pad_device->charger_pad_dock_detect_timer, jiffies +(5*HZ));
+		if(pad_device->dock_in)
+			power_supply_changed(&pad_supply[Charger_Type_Docking_AC]);
+	}else if(battery_cable_status == USB_NO_Cable){
+		power_supply_changed(&pad_supply[Charger_Type_Battery]);	
 	}
 	return 0;
 }
-EXPORT_SYMBOL(docking_callback);
 
-void   init_docking_charging_irq(void)
+
+void battery_callback(unsigned usb_cable_state)
 {
-       int rc;
-
-	rc = gpio_request(TEGRA_GPIO_PS5,"dock_charging");
-	if (rc< 0)
-		printk(KERN_ERR"TEGRA_GPIO_PS5 GPIO%d request fault!%d\n",TEGRA_GPIO_PS5,rc);
-	rc= gpio_direction_input(TEGRA_GPIO_PS5);
-	if (rc)
-	        printk(KERN_ERR"gpio_direction_input failed for input TEGRA_GPIO_PS5=%d\n", TEGRA_GPIO_PS5);
-	 rc= request_irq(gpio_to_irq(TEGRA_GPIO_PS5), charger_pad_dock_interrupt, IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING, "dock_charging" , NULL);
-	pad_device->dock_charger_pad_interrupt_enabled=true;
-	if (rc < 0)
-	        printk(KERN_ERR"Could not register for TEGRA_GPIO_PS5 interrupt, irq = %d, rc = %d\n", gpio_to_irq(TEGRA_GPIO_PS5), rc);
+	printk("[battery_callback] usb_cable_state =%x\n",usb_cable_state ) ;
+	if(!battery_driver_ready){
+		printk("battery_callback battery driver not ready\n") ;
+		return 0;
+	}
+	cable_status_callback(usb_cable_state);
+	cancel_delayed_work(&pad_device->status_poll_work);
+	queue_delayed_work(battery_work_queue, &pad_device->status_poll_work,0.3*HZ);
 }
+//[Brook- Docking charging porting]>>
+static void dock_battery_status_poll(struct work_struct *work)
+{
+	struct pad_device_info *battery_device =container_of(work, struct pad_device_info,dock_status_poll_work.work);
+	if(!battery_driver_ready)
+		printk("[dock_battery_status_poll] driver not ready\n");
+	printk("[dock_battery_status_poll] %u \n",BATTERY_POLLING_RATE);
+	power_supply_changed(&pad_supply[Charger_Type_Docking_Battery]);
+	/* Schedule next poll */
+	queue_delayed_work(dock_battery_work_queue, &battery_device->dock_status_poll_work,BATTERY_POLLING_RATE*HZ);
+}
+
+int docking_callback(unsigned usb_cable_state)
+{
+	printk("[docking_callback] dock %s , usb_cable_state = %d \n", pad_device->dock_in?"inserted":"removed", usb_cable_state);
+	if(!battery_driver_ready){
+		printk("[docking_callback] battery driver not ready\n") ;
+		return 0;
+	}
+	cable_status_callback(usb_cable_state);
+	cancel_delayed_work(&pad_device->dock_status_poll_work);
+	queue_delayed_work(dock_battery_work_queue, &pad_device->dock_status_poll_work,0.3*HZ);
+	return 0;
+}
+EXPORT_SYMBOL(docking_callback);
+//[Brook- Docking charging porting]<<
 static int pad_get_health(enum power_supply_property psp,
 	union power_supply_propval *val)
 {	
@@ -601,39 +567,35 @@ static int pad_get_health(enum power_supply_property psp,
 	}
 	return 0;
 }
-static int pad_get_psp(int reg_offset, enum power_supply_property psp,
-	union power_supply_propval *val)
+static int pad_get_psp(int reg_offset, enum power_supply_property psp,union power_supply_propval *val, int battery_type)
 {
 	s32 ret;
 	int smb_retry=0;
 	if(pad_device->battery_present){
-			do{
-				if (psp == POWER_SUPPLY_PROP_VOLTAGE_NOW){
-					pad_device->smbus_status=pad_device->bat_vol=asuspec_battery_monitor("voltage");
-					battery_current=asuspec_battery_monitor("current");
-					battery_remaining_capacity=asuspec_battery_monitor("remaining_capacity");
-				}
-				else if (psp == POWER_SUPPLY_PROP_STATUS)
-					pad_device->smbus_status=pad_device->bat_status=asuspec_battery_monitor("status");
-				else  if (psp == POWER_SUPPLY_PROP_TEMP)
-					pad_device->smbus_status=pad_device->bat_temp=asuspec_battery_monitor("temperature");
-			}while((pad_device->smbus_status < 0) && ( ++smb_retry <= SMBUS_RETRY));
-
+		do{
+			if (psp == POWER_SUPPLY_PROP_VOLTAGE_NOW){
+				pad_device->smbus_status=pad_device->bat_vol=asuspec_battery_monitor("voltage",pad_battery_type);
+				battery_current=asuspec_battery_monitor("current",pad_battery_type);
+				battery_remaining_capacity=asuspec_battery_monitor("remaining_capacity",pad_battery_type);
+			}
+			else if (psp == POWER_SUPPLY_PROP_STATUS)
+				pad_device->smbus_status=pad_device->bat_status=asuspec_battery_monitor("status",pad_battery_type);
+			else  if (psp == POWER_SUPPLY_PROP_TEMP)
+				pad_device->smbus_status=pad_device->bat_temp=asuspec_battery_monitor("temperature",pad_battery_type);
+		}while((pad_device->smbus_status < 0) && ( ++smb_retry <= SMBUS_RETRY));
 	}else{
-			pad_device->smbus_status=-1;
-			printk("pad_get_psp: pad_device->battery_present=%u\n",pad_device->battery_present);
+		pad_device->smbus_status=-1;
+		printk("pad_get_psp: pad_device->battery_present=%u\n",pad_device->battery_present);
 	}
 	if (pad_device->smbus_status < 0) {
-		dev_err(&pad_device->client->dev,
-			"%s: i2c read for %d failed\n", __func__, reg_offset);
-		
+		dev_err(&pad_device->client->dev,"%s: i2c read for %d failed\n", __func__, reg_offset);
 		if(psp == POWER_SUPPLY_PROP_TEMP && (++pad_device->temp_err<=3) &&(pad_device->old_temperature!=0xFF)){
 			val->intval=pad_device->old_temperature;
 			printk("read battery's tempurate fail use old temperature=%u pad_device->temp_err=%u\n",val->intval,pad_device->temp_err);
 			return 0;
 		}
 		else
-		return -EINVAL;
+			return -EINVAL;
 	}
 	if (psp == POWER_SUPPLY_PROP_VOLTAGE_NOW) {
 		val->intval=pad_device->bat_vol;
@@ -643,18 +605,16 @@ static int pad_get_psp(int reg_offset, enum power_supply_property psp,
 		ret=pad_device->bat_status;
 		static char *status_text[] = {"Unknown", "Charging", "Discharging", "Not charging", "Full"};
 		/* mask the upper byte and then find the actual status */
-		if (!(ret & BATTERY_CHARGING) && (ac_on||battery_docking_status) ){/*DSG*/
+		if (Check_Charging_status(pad_battery_type) && (ac_on||pad_device->dock_in) ){/*DSG*/
 			val->intval = POWER_SUPPLY_STATUS_CHARGING;
 			if (pad_device->old_capacity==100)
 				val->intval = POWER_SUPPLY_STATUS_FULL;
 		}
-		else if (ret & BATTERY_FULL_CHARGED)//fc
-			val->intval = POWER_SUPPLY_STATUS_FULL;
-		else if (ret & BATTERY_FULL_DISCHARGED)//fd
+		else if (pad_device->old_capacity==100 && ac_on)//fc
 			val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
 		else 
 			val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
-		printk("pad_get_psp  val->intval=%s ret=%x\n" ,status_text[val->intval],ret);//4
+	    	printk("pad_get_psp,  val->intval = %s, ret = %x, ac_on = %x, Check_Charging_status = %d \n" ,status_text[val->intval],ret,ac_on,Check_Charging_status(pad_battery_type));//4
 	}else if (psp == POWER_SUPPLY_PROP_TEMP) {
 		ret=pad_device->bat_temp;
 		ret -=TEMP_KELVIN_TO_CELCIUS;
@@ -673,14 +633,14 @@ static int pad_get_psp(int reg_offset, enum power_supply_property psp,
 	}
 	return 0;
 }
-static int pad_get_capacity(union power_supply_propval *val)
+static int pad_get_capacity(union power_supply_propval *val, int battery_type)
 {
 	s32 ret;
 	s32 temp_capacity;
 	int smb_retry=0;
 	if(pad_device->battery_present){
 		do{
-			pad_device->smbus_status=pad_device->bat_capacity=asuspec_battery_monitor("capacity");
+			pad_device->smbus_status=pad_device->bat_capacity=asuspec_battery_monitor("capacity",pad_battery_type);
 		}while((pad_device->smbus_status < 0) && ( ++smb_retry <= SMBUS_RETRY));
 
 	}else{
@@ -751,7 +711,7 @@ static int pad_get_property(struct power_supply *psy,
 			break;
 
 		case POWER_SUPPLY_PROP_CAPACITY:
-			if (pad_get_capacity(val))
+			if (pad_get_capacity(val, pad_battery_type))
 				goto error;
 			break;
 
@@ -767,7 +727,7 @@ static int pad_get_property(struct power_supply *psy,
 					break;
 			}
 
-			if (pad_get_psp(count, psp, val))
+			if (pad_get_psp(count, psp, val, pad_battery_type))
 				return -EINVAL;//return -EINVAL;
 			break;
 
@@ -807,32 +767,36 @@ static int pad_probe(struct i2c_client *client,
 	memset(pad_device, 0, sizeof(*pad_device));
 	pad_device->client = client;
 	i2c_set_clientdata(client, pad_device);
-       pad_device->smbus_status=0;
-       pad_device->cap_err=0;
-       pad_device->temp_err=0;
+	pad_device->smbus_status=0;
+	pad_device->cap_err=0;
+	pad_device->temp_err=0;
 	pad_device->old_capacity=0xFF;
-       pad_device->old_temperature=0xFF;
-	pad_device->low_battery_present=0;
-	pad_device->gpio_battery_detect=GPIOPIN_BATTERY_DETECT;
-
+	pad_device->old_temperature=0xFF;
+	//[Brook- Docking charging porting]>>
+	pad_device->dock_cap_err=0;
+	pad_device->dock_old_capacity=0xFF;
+	//[Brook- Docking charging porting]<<
+	pad_device->low_battery_present=Check_BAT_LL_Enabled();
+	pad_device->battery_present = Check_Battery_status();
+	pad_device->gpio_dock_detect= dock_in_gpio;
 	for (i = 0; i < ARRAY_SIZE(pad_supply); i++) {
 		rc = power_supply_register(&client->dev, &pad_supply[i]);
 		if (rc) {
-			printk(KERN_ERR "Failed to register power supply\n");
+			printk(KERN_ERR "Failed to register power supply for pad \n");
 			while (i--)
 				power_supply_unregister(&pad_supply[i]);
 			kfree(pad_device);
 			return rc;
 		}
 	}
-
 	dev_info(&pad_device->client->dev,"%s: battery driver registered\n", client->name);
-       spin_lock_init(&pad_device->lock);
+	spin_lock_init(&pad_device->lock);
 	INIT_DELAYED_WORK(&pad_device->status_poll_work, battery_status_poll) ;
-       INIT_DELAYED_WORK(&pad_device->battery_stress_test,  battery_strees_test) ;
+	INIT_DELAYED_WORK(&pad_device->dock_status_poll_work, dock_battery_status_poll) ;
+	INIT_DELAYED_WORK(&pad_device->battery_stress_test,  battery_strees_test) ;
 	INIT_DELAYED_WORK(&pad_device->low_low_bat_work , low_low_battery_check) ;
-        battery_work_queue = create_singlethread_workqueue("battery_workqueue");
-	setup_timer(&pad_device->charger_pad_dock_detect_timer, charger_pad_dock_detection, 0);
+	battery_work_queue = create_singlethread_workqueue("battery_workqueue");
+	dock_battery_work_queue = create_singlethread_workqueue("dock_battery_workqueue");
 	/* Register sysfs hooks */
 	if (sysfs_create_group(&client->dev.kobj, &battery_smbus_group )) {
 		dev_err(&client->dev, "Not able to create the sysfs\n");
@@ -843,33 +807,146 @@ static int pad_probe(struct i2c_client *client,
 	{
 		dev_err(&client->dev, "pad_battery_probe: unable to create battery_group sysfs\n");
 	}
+	battery_cable_status = Check_Charging_Cable_Type();
+	cancel_delayed_work(&pad_device->status_poll_work);
+	cancel_delayed_work(&pad_device->dock_status_poll_work);
+	//setup_detect_irq();
+	//setup_low_battery_irq();
+	pad_device->battery_misc.minor	= MISC_DYNAMIC_MINOR;
+	pad_device->battery_misc.name	= "battery";
+	pad_device->battery_misc.fops  	= &battery_fops;
+	rc=misc_register(&pad_device->battery_misc);
+	printk(KERN_INFO "battery register misc device for I2C stress test rc=%x\n", rc);
 
-	init_docking_charging_irq();
-	battery_cable_status = get_usb_cable_status();
-	 cancel_delayed_work(&pad_device->status_poll_work);
-	 setup_detect_irq();
-	 setup_low_battery_irq();
-        pad_device->battery_misc.minor	= MISC_DYNAMIC_MINOR;
-	 pad_device->battery_misc.name	= "battery";
-	 pad_device->battery_misc.fops  	= &battery_fops;
-        rc=misc_register(&pad_device->battery_misc);
-	 printk(KERN_INFO "battery register misc device for I2C stress test rc=%x\n", rc);
-
-	 wake_lock_init(&pad_device->low_battery_wake_lock, WAKE_LOCK_SUSPEND, "low_battery_detection");
-	 wake_lock_init(&pad_device->cable_event_wake_lock, WAKE_LOCK_SUSPEND, "battery_cable_event");
-	 battery_driver_ready=1;
+	wake_lock_init(&pad_device->low_battery_wake_lock, WAKE_LOCK_SUSPEND, "low_battery_detection");
+	wake_lock_init(&pad_device->cable_event_wake_lock, WAKE_LOCK_SUSPEND, "battery_cable_event");
+	battery_driver_ready=1;
 	if(pad_device->battery_present)
 		queue_delayed_work(battery_work_queue, &pad_device->status_poll_work,15*HZ);
-	if( tegra3_get_project_id()==TEGRA3_PROJECT_TF201)
-		config_thermal_power();
+	if(pad_device->dock_in)
+		queue_delayed_work(dock_battery_work_queue, &pad_device->dock_status_poll_work,15*HZ);
 	return 0;
 }
+
+//[Brook- Docking charging porting]>>
+static int dock_get_capacity(union power_supply_propval *val){
+	s32 ret;
+	s32 temp_capacity;
+	int smb_retry=0;
+	if(!(gpio_get_value(pad_device->gpio_dock_detect))){
+		do{
+			pad_device->smbus_status=pad_device->dock_bat_capacity=asuspec_battery_monitor("capacity",dock_battery_type);
+		}while((pad_device->smbus_status < 0) && ( ++smb_retry <= SMBUS_RETRY));
+
+	}else{
+		return 0;
+	}
+	if (pad_device->smbus_status < 0) {
+		dev_err(&pad_device->client->dev, "%s: i2c read for %d "
+			"failed pad_device->dock_cap_err=%u\n", __func__, REG_CAPACITY,pad_device->dock_cap_err);
+		if(pad_device->dock_cap_err>5 || (pad_device->dock_old_capacity==0xFF))
+			return -EINVAL;
+		else{
+			val->intval=pad_device->dock_old_capacity;
+			pad_device->dock_cap_err++;
+			printk("read capacity fail, use old capacity=%u pad_device->dock_cap_err=%u\n",val->intval,pad_device->dock_cap_err);
+			return 0;
+		}
+	}
+	ret=pad_device->dock_bat_capacity;
+	/* pad spec says that this can be >100 %
+	* even if max value is 100 % */
+
+	temp_capacity = ((ret >= 100) ? 100 : ret);
+
+	/* start: for mapping %99 to 100%. Lose 84%*/
+	if(temp_capacity==99)
+		temp_capacity=100;
+	if(temp_capacity >=84 && temp_capacity <=98)
+		temp_capacity++;
+	/* for mapping %99 to 100% */
+
+	/* lose 26% 47% 58%,69%,79% */
+	if(temp_capacity >70 && temp_capacity <80)
+		temp_capacity-=1;
+	else if(temp_capacity >60&& temp_capacity <=70)
+		temp_capacity-=2;
+	else if(temp_capacity >50&& temp_capacity <=60)
+		temp_capacity-=3;
+	else if(temp_capacity >30&& temp_capacity <=50)
+		temp_capacity-=4;
+	else if(temp_capacity >=0&& temp_capacity <=30)
+		temp_capacity-=5;
+
+	/*Re-check capacity to avoid  that temp_capacity <0*/
+	temp_capacity = ((temp_capacity <0) ? 0 : temp_capacity);
+	val->intval=temp_capacity;
+
+
+	pad_device->dock_old_capacity=val->intval;
+	pad_device->dock_cap_err=0;
+	printk("dock_get_capacity val->intval=%u ret=%u\n",val->intval,ret);
+	return 0;
+}
+
+static int dock_get_status(union power_supply_propval *val){
+	int ret_val = 0;
+	val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
+	if (ret_val < 0){
+		return -1;
+	}
+	else {
+		if(gpio_get_value(pad_device->gpio_dock_detect)){
+			pr_debug("dock_get_status: gpio_dock_detect Pin = %u, dock not exit! \n",gpio_get_value(pad_device->gpio_dock_detect));
+			return 0;
+		}
+		//[Brook- Fix dock battery show charging icon when full]>>
+		pad_device->dock_bat_status=asuspec_battery_monitor("status",dock_battery_type);
+		static char *status_text[] = {"Unknown", "Charging", "Discharging", "Not charging", "Full"};
+		if (Check_Charging_status(dock_battery_type) && ac_on){
+			val->intval = POWER_SUPPLY_STATUS_CHARGING;
+			if (pad_device->dock_old_capacity==100)
+				val->intval = POWER_SUPPLY_STATUS_FULL;
+		}
+		else if (pad_device->dock_old_capacity==100 && ac_on)
+	        	val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
+		else 
+	        	val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
+		printk("[dock_get_status] val->intval = %s, pad_device->dock_bat_status = %x, ac_on = %x, Check_Charging_status= %x \n" ,status_text[val->intval],pad_device->dock_bat_status,ac_on,Check_Charging_status(dock_battery_type));
+		//[Brook- Fix dock battery show charging icon when full]<<
+		return 0;
+	}
+	return -1;
+
+}
+static int dock_battery_get_property(struct power_supply *psy,enum power_supply_property psp,union power_supply_propval *val)
+{
+	u8 count;
+	switch (psp) {
+		case POWER_SUPPLY_PROP_CAPACITY:
+			if(dock_get_capacity(val) < 0)
+				goto error;
+			break;
+		case POWER_SUPPLY_PROP_STATUS:
+			if(dock_get_status(val) < 0)
+				goto error;
+			break;
+		default:
+			return -EINVAL;
+	}
+	return 0;
+
+error:
+	return -EINVAL;
+}
+
+//[Brook- Docking charging porting]<<
+
 static int pad_remove(struct i2c_client *client)
 {
 	struct pad_device_info *pad_device;
        int i=0;
 	pad_device = i2c_get_clientdata(client);
-	del_timer_sync(&pad_device->charger_pad_dock_detect_timer);
 	for (i = 0; i < ARRAY_SIZE(pad_supply); i++) {
 		power_supply_unregister(&pad_supply[i]);
 	}
@@ -888,10 +965,12 @@ static int pad_suspend(struct i2c_client *client,
 {
 
 	cancel_delayed_work_sync(&pad_device->status_poll_work);
-	del_timer_sync(&pad_device->charger_pad_dock_detect_timer);
-       flush_workqueue(battery_work_queue);
-	if(tegra3_get_project_id()==TEGRA3_PROJECT_TF201)
-		gpio_direction_output(TEGRA_GPIO_PU3, 0);
+	flush_workqueue(battery_work_queue);
+	pad_device->dock_in =!(gpio_get_value(pad_device->gpio_dock_detect));
+	if(pad_device->dock_in){
+		cancel_delayed_work_sync(&pad_device->dock_status_poll_work);
+		flush_workqueue(dock_battery_work_queue);
+	}
 	return 0;
 }
 
@@ -899,11 +978,14 @@ static int pad_suspend(struct i2c_client *client,
 
 static int pad_resume(struct i2c_client *client)
 {
-	pad_device->battery_present =!(gpio_get_value(pad_device->gpio_battery_detect));
+	pad_device->battery_present =Check_Battery_status();
+	pad_device->dock_in =!(gpio_get_value(pad_device->gpio_dock_detect));
 	cancel_delayed_work(&pad_device->status_poll_work);
 	queue_delayed_work(battery_work_queue,&pad_device->status_poll_work,5*HZ);
-	if(tegra3_get_project_id()==TEGRA3_PROJECT_TF201)
-		gpio_direction_output(TEGRA_GPIO_PU3, 1);
+	if(pad_device->dock_in){
+		cancel_delayed_work(&pad_device->dock_status_poll_work);
+		queue_delayed_work(dock_battery_work_queue,&pad_device->dock_status_poll_work,5*HZ);
+	}
 	return 0;
 }
 #endif
@@ -928,24 +1010,16 @@ static struct i2c_driver pad_battery_driver = {
 static int __init pad_battery_init(void)
 {
 	int ret = 0;
-
-	if(tegra3_get_project_id() != TEGRA3_PROJECT_ME301T)
-	{
-		ret = i2c_add_driver(&pad_battery_driver);
-		if (ret)
-			dev_err(&pad_device->client->dev,
-				"%s: i2c_add_driver failed\n", __func__);
-	}
+	ret = i2c_add_driver(&pad_battery_driver);
+	if (ret)
+	    dev_err(&pad_device->client->dev,"%s: i2c_add_driver failed\n", __func__);
 	return ret;
 }
 module_init(pad_battery_init);
 
 static void __exit pad_battery_exit(void)
 {
-	if(tegra3_get_project_id() != TEGRA3_PROJECT_ME301T)
-	{
-		i2c_del_driver(&pad_battery_driver);
-	}
+	i2c_del_driver(&pad_battery_driver);
 }
 module_exit(pad_battery_exit);
 

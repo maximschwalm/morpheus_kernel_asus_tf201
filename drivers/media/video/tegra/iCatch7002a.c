@@ -189,7 +189,7 @@ enum {
 	SENSOR_MODE_640x480,
 };
 
-int tegra_camera_mclk_on_off(int on);
+//int tegra_camera_mclk_on_off(int on);
 
 bool IsTF300(void){
 	if( tegra3_get_project_id() == TEGRA3_PROJECT_TF300T  ||
@@ -206,7 +206,7 @@ void i7002a_isp_on(int power_on)
 	if (power_on == 0) {
 		if (sensor_opened == true) {
 			if (info->pdata && info->pdata->power_off) {
-				tegra_camera_mclk_on_off(0);
+				//tegra_camera_mclk_on_off(0);
 				info->pdata->power_off();
 				sensor_opened = false;
 			} else {
@@ -219,7 +219,7 @@ void i7002a_isp_on(int power_on)
 		if (sensor_opened == false) {
 			if (info->pdata && info->pdata->power_on) {
 				info->pdata->power_on();
-				tegra_camera_mclk_on_off(1);
+				//tegra_camera_mclk_on_off(1);
 				msleep(100);
 				sensor_opened = true;
 			} else {
@@ -3666,7 +3666,7 @@ static ssize_t dbg_iCatch7002a_vga_status_read(struct file *file, char __user *b
 	if (sensor_opened == false) {
 		if (info->pdata && info->pdata->power_on) {
 			info->pdata->power_on();
-			tegra_camera_mclk_on_off(1);
+			//tegra_camera_mclk_on_off(1);
 			msleep(100);
 		} else {
 			len = snprintf(bp, dlen, "iCatch7002a info isn't enough for power_on.\n");
@@ -3753,7 +3753,7 @@ static ssize_t dbg_iCatch7002a_vga_status_read(struct file *file, char __user *b
 
 	if (sensor_opened == false) {
 		if (info->pdata && info->pdata->power_off) {
-			tegra_camera_mclk_on_off(0);
+			//tegra_camera_mclk_on_off(0);
 			info->pdata->power_off();
 		} else {
 			len = snprintf(bp, dlen, "iCatch7002a info isn't enough for power_off.\n");
@@ -3794,7 +3794,7 @@ static ssize_t dbg_iCatch7002a_camera_status_read(struct file *file, char __user
 	if (sensor_opened == false) {
 		if (info->pdata && info->pdata->power_on) {
 			info->pdata->power_on();
-			tegra_camera_mclk_on_off(1);
+			//tegra_camera_mclk_on_off(1);
 			msleep(100);
 		} else {
 			len = snprintf(bp, dlen, "iCatch7002a info isn't enough for power_on.\n");
@@ -3901,7 +3901,7 @@ static ssize_t dbg_iCatch7002a_camera_status_read(struct file *file, char __user
 
 	if (sensor_opened == false) {
 		if (info->pdata && info->pdata->power_off) {
-			tegra_camera_mclk_on_off(0);
+			//tegra_camera_mclk_on_off(0);
 			info->pdata->power_off();
 		} else {
 			len = snprintf(bp, dlen, "iCatch7002a info isn't enough for power_off.\n");
@@ -3945,7 +3945,7 @@ static int dbg_iCatch7002a_chip_power_write(struct file *file, char __user *buf,
 		//power off
 		if (sensor_opened==true) {
 			if (info->pdata && info->pdata->power_off) {
-				tegra_camera_mclk_on_off(0);
+				//tegra_camera_mclk_on_off(0);
 				info->pdata->power_off();
 				sensor_opened=false;
 				printk("%s:power off\n", __func__);
@@ -3956,7 +3956,7 @@ static int dbg_iCatch7002a_chip_power_write(struct file *file, char __user *buf,
 		//power on
 		if (sensor_opened==false) {
 			if (info->pdata && info->pdata->power_on) {
-				tegra_camera_mclk_on_off(1);
+				//tegra_camera_mclk_on_off(1);
 				info->pdata->power_on();
 				sensor_opened=true;
 				msleep(100);

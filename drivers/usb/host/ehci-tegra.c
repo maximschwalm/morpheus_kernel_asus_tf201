@@ -26,9 +26,7 @@
 #include <../tegra_usb_phy.h>
 #include <linux/gpio.h>
 #include <../gpio-names.h>
-#include <mach/board-cardhu-misc.h>
 #include <mach/clk.h>
-#include "board-cardhu.h"
 
 #if 0
 #define EHCI_DBG(stuff...)	pr_info("ehci-tegra: " stuff)
@@ -43,11 +41,7 @@ static struct usb_hcd *usb3_ehci_handle;
 static struct delayed_work usb3_ehci_dock_in_work;
 static unsigned  int gpio_dock_in_irq = 0;
 
-static struct tegra_ehci_hcd *modem_ehci_tegra;
-
 #define TEGRA_USB_DMA_ALIGN 32
-static struct platform_device *dock_port_device;
-static struct platform_device *modem_port_device;
 
 struct tegra_ehci_hcd {
 	struct ehci_hcd *ehci;
@@ -100,6 +94,7 @@ static irqreturn_t gpio_dock_in_irq_handler(struct usb_hcd *hcd)
 	return IRQ_HANDLED;
 }
 
+
 static void gpio_dock_in_irq_init(struct usb_hcd *hcd)
 {
 	int ret = 0;
@@ -120,26 +115,6 @@ static void gpio_dock_in_irq_init(struct usb_hcd *hcd)
 	printk(KERN_INFO "%s: request irq = %d, ret = %d\n", __func__, gpio_dock_in_irq, ret);
 	INIT_DELAYED_WORK(&usb3_ehci_dock_in_work, usb3_ehci_dock_in_work_handler);
 }
-
-void tegra_ehci_modem_port_host_reregister(void)
-{
-	if (!modem_port_device) {
-		pr_err("%s: !modem_port_device\n", __func__);
-		return -EINVAL;
-	}
-
-	tegra_cardhu_usb_utmip_host_unregister(modem_port_device);
-	modem_port_device = NULL;
-	mdelay(500);
-	modem_port_device = tegra_cardhu_usb_utmip_host_register();
-}
-EXPORT_SYMBOL(tegra_ehci_modem_port_host_reregister);
-
-struct platform_device *dock_port_device_info(void)
-{
-	return dock_port_device;
-}
-EXPORT_SYMBOL(dock_port_device_info);
 
 static void free_align_buffer(struct urb *urb)
 {
@@ -582,7 +557,6 @@ static int tegra_ehci_probe(struct platform_device *pdev)
 		usb3_ehci_handle = hcd;
 		usb3_init = 1;
 		gpio_dock_in_irq_init(hcd);
-		dock_port_device = pdev;
 	}
 
 	err = tegra_usb_phy_power_on(tegra->phy);
@@ -622,12 +596,6 @@ static int tegra_ehci_probe(struct platform_device *pdev)
 	}
 #endif
 
-	if (tegra->phy->inst == 1 && tegra3_get_project_id() == TEGRA3_PROJECT_TF300TG) {
-		modem_ehci_tegra = tegra;
-	} else if (tegra->phy->inst == 1 && tegra3_get_project_id() == TEGRA3_PROJECT_TF300TL) {
-		modem_port_device = pdev;
-	}
-
 	printk(KERN_INFO "%s - #####\n", __func__);
 	return err;
 
@@ -650,9 +618,6 @@ static int tegra_ehci_resume(struct platform_device *pdev)
 	struct tegra_ehci_hcd *tegra = platform_get_drvdata(pdev);
 	int ret;
 
-	if (tegra->phy->inst == 1 && tegra3_get_project_id() == TEGRA3_PROJECT_P1801)
-		gpio_set_value(TEGRA_GPIO_PH7, 1);
-
 	pr_info("%s instance %d +\n", __func__, tegra->phy->inst);
 	ret = tegra_usb_phy_power_on(tegra->phy);
 	tegra_usb_phy_port_power(tegra->phy);
@@ -664,9 +629,6 @@ static int tegra_ehci_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	struct tegra_ehci_hcd *tegra = platform_get_drvdata(pdev);
 	int ret;
-
-	if (tegra->phy->inst == 1 && tegra3_get_project_id() == TEGRA3_PROJECT_P1801)
-		gpio_set_value(TEGRA_GPIO_PH7, 0);
 
 	pr_info("%s instance %d, bus_suspended_fail %d +\n", __func__, tegra->phy->inst, tegra->bus_suspended_fail);
 	/* bus suspend could have failed because of remote wakeup resume */
@@ -701,7 +663,6 @@ static int tegra_ehci_remove(struct platform_device *pdev)
 		free_irq(gpio_dock_in_irq, hcd);
 		usb3_ehci_handle = NULL;
 		usb3_init = 0;
-		dock_port_device = NULL;
 	}
 
 	//if (tegra->irq)
@@ -730,16 +691,12 @@ static void tegra_ehci_hcd_shutdown(struct platform_device *pdev)
 	struct tegra_ehci_hcd *tegra = platform_get_drvdata(pdev);
 	struct usb_hcd *hcd = ehci_to_hcd(tegra->ehci);
 
-	if (tegra->phy->inst == 1 && tegra3_get_project_id() == TEGRA3_PROJECT_P1801)
-		gpio_free(TEGRA_GPIO_PH7);
-
 	pr_info("%s instance %d +\n", __func__, tegra->phy->inst);
 
 	if (tegra->phy->inst == 2 && usb3_init == 1) {
 		free_irq(gpio_dock_in_irq, hcd);
 		usb3_ehci_handle = NULL;
 		usb3_init = 0;
-		dock_port_device = NULL;
 	}
 
 	if (hcd->driver->shutdown)

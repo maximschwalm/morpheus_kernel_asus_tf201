@@ -56,7 +56,7 @@
 #include "tegra_asoc_utils.h"
 
 #include <mach/board-cardhu-misc.h>
-#include "../drivers/input/asusec/asusdec.h"
+#include "../drivers/input/asusec/asuspec.h"
 
 #include <asm/gpio.h>
 #include "../gpio-names.h"

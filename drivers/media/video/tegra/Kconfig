@@ -80,6 +80,13 @@ config VIDEO_OV2710
           This is a driver for the Omnivision OV2710 camera sensor
           for use with the tegra isp.
 
+config VIDEO_OV2720
+        tristate "OV2720 camera sensor support"
+        depends on I2C && ARCH_TEGRA
+        ---help---
+          This is a driver for the Omnivision OV2720 camera sensor
+          for use with the tegra isp.
+
 config VIDEO_AR0832
         tristate "AR0832 camera sensor support"
         depends on I2C && ARCH_TEGRA
@@ -94,6 +101,12 @@ config VIDEO_SOC380
           This is a driver for the Semco soc380 camera sensor
           for use with the tegra isp.
 
+config VIDEO_IMX175
+        tristate "IMX175 camera sensor support"
+        depends on I2C && ARCH_TEGRA
+        ---help---
+          This is a driver for the Sony IMX175 camera sensor
+          for use with the tegra isp.
 config TORCH_SSL3250A
         tristate "SSL3250A flash/torch support"
         depends on I2C && ARCH_TEGRA
@@ -125,4 +138,10 @@ config VIDEO_AD5816
         depends on I2C && ARCH_TEGRA
         ---help---
           This is a driver for the AD5816 focuser
+          for use with the tegra isp.
+config VIDEO_DW9714
+        tristate "DW9714 focuser support"
+        depends on I2C && ARCH_TEGRA
+        ---help---
+          This is a driver for the DW9714 focuser
           for use with the tegra isp.

@@ -782,6 +782,8 @@ static int fm34_resume(struct device *dev)
 static int __init fm34_init(void)
 {
 	unsigned int project_info = 0;
+        return 0;        
+
 	project_info = tegra3_get_project_id();
 
 	if(project_info == TEGRA3_PROJECT_TF500T ||

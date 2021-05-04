@@ -342,6 +342,13 @@ __tegra_dvfs_set_rate(struct dvfs *d, unsigned long rate)
 
 	if (freqs == NULL || d->millivolts == NULL)
 		return -ENODEV;
+	//[Asus work around resume issue]>>
+    if(d->clk_name == "sbc4"){
+		if(rate > 100000000){
+            rate = 100000000;
+        }
+    }
+	//[Asus work around resume issue]<< 
 
 	if (rate > freqs[d->num_freqs - 1]) {
 		pr_warn("tegra_dvfs: rate %lu too high for dvfs on %s\n", rate,

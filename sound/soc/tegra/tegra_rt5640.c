@@ -101,15 +101,19 @@ static int tegra_rt5640_hw_params(struct snd_pcm_substream *substream,
 	switch (pdata->i2s_param[HIFI_CODEC].i2s_mode) {
 		case TEGRA_DAIFMT_I2S :
 			i2s_daifmt |= SND_SOC_DAIFMT_I2S;
+                        printk("%s: I2S \n", __func__);
 			break;
 		case TEGRA_DAIFMT_DSP_A :
 			i2s_daifmt |= SND_SOC_DAIFMT_DSP_A;
+                        printk("%s: DSP_A \n", __func__);
 			break;
 		case TEGRA_DAIFMT_DSP_B :
 			i2s_daifmt |= SND_SOC_DAIFMT_DSP_B;
+                        printk("%s: DSP_B \n", __func__);
 			break;
 		case TEGRA_DAIFMT_LEFT_J :
 			i2s_daifmt |= SND_SOC_DAIFMT_LEFT_J;
+                        printk("%s: lEFT \n", __func__);
 			break;
 		case TEGRA_DAIFMT_RIGHT_J :
 			i2s_daifmt |= SND_SOC_DAIFMT_RIGHT_J;
@@ -144,13 +148,13 @@ static int tegra_rt5640_hw_params(struct snd_pcm_substream *substream,
 		dev_err(card->dev, "cpu_dai fmt not set\n");
 		return err;
 	}
-
+        
 	err = snd_soc_dai_set_sysclk(codec_dai, 0, rate, SND_SOC_CLOCK_IN);
 	if (err < 0) {
 		dev_err(card->dev, "codec_dai clock not set\n");
 		return err;
 	}
-
+        printk("%s: hw param, srate %d mclk %d \n", __func__, srate, mclk);
 	return 0;
 }
 
@@ -408,6 +412,9 @@ static int tegra_rt5640_event_int_spk(struct snd_soc_dapm_widget *w,
 	struct snd_soc_card *card = dapm->card;
 	struct tegra_rt5640 *machine = snd_soc_card_get_drvdata(card);
 	struct tegra_asoc_platform_data *pdata = machine->pdata;
+
+        printk("%s(): speaker \n", __func__);
+
 
 	if (machine->spk_reg) {
 		if (SND_SOC_DAPM_EVENT_ON(event))
@@ -779,6 +786,7 @@ static int __init tegra_rt5640_modinit(void)
 {
 	printk(KERN_INFO "%s+ #####\n", __func__);
 	int ret = 0;
+/*
 	 u32 project_info = tegra3_get_project_id();
 	if(project_info == TEGRA3_PROJECT_TF500T || project_info == TEGRA3_PROJECT_P1801 ||
 		project_info == TEGRA3_PROJECT_ME301T ||
@@ -789,6 +797,9 @@ static int __init tegra_rt5640_modinit(void)
 		printk("%s(): not support codec rt5642\n", __func__);
 		return 0;
 	}
+*/
+
+        printk("%s(): support codec rt5642\n", __func__);
 	ret = platform_driver_register(&tegra_rt5640_driver);
 	audio_dock_init();
 	printk(KERN_INFO "%s- #####\n", __func__);

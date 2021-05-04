@@ -58,6 +58,7 @@ static struct regulator_consumer_supply tps6591x_vdd1_supply_skubit0_0[] = {
 
 static struct regulator_consumer_supply tps6591x_vdd1_supply_skubit0_1[] = {
 	REGULATOR_SUPPLY("en_vddio_ddr_1v2", NULL),
+        REGULATOR_SUPPLY("TF600T_panel_1v2", NULL), //For TF600 panel power
 };
 
 static struct regulator_consumer_supply tps6591x_vdd2_supply_0[] = {
@@ -121,12 +122,6 @@ static struct regulator_consumer_supply tps6591x_ldo2_supply_0[] = {
 	REGULATOR_SUPPLY("vdd_sata", NULL),
 	REGULATOR_SUPPLY("avdd_sata_pll", NULL),
 	REGULATOR_SUPPLY("avdd_plle", NULL),
-	REGULATOR_SUPPLY("vddio_sd_slot", "sdhci-tegra.0"),
-};
-
-static struct regulator_consumer_supply tps6591x_ldo3_supply_e118x[] = {
-	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.0"),
-	REGULATOR_SUPPLY("pwrdet_sdmmc1", NULL),
 };
 
 static struct regulator_consumer_supply tps6591x_ldo3_supply_e1198[] = {
@@ -139,18 +134,18 @@ static struct regulator_consumer_supply tps6591x_ldo4_supply_0[] = {
 
 static struct regulator_consumer_supply tps6591x_ldo5_supply_e118x[] = {
 	REGULATOR_SUPPLY("avdd_vdac", NULL),
+	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.0"),
 };
 
 static struct regulator_consumer_supply tps6591x_ldo5_supply_e1198[] = {
 	REGULATOR_SUPPLY("avdd_vdac", NULL),
-	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.0"),
-	REGULATOR_SUPPLY("pwrdet_sdmmc1", NULL),
 };
 
 static struct regulator_consumer_supply tps6591x_ldo6_supply_0[] = {
 	REGULATOR_SUPPLY("avdd_dsi_csi", NULL),
 	REGULATOR_SUPPLY("pwrdet_mipi", NULL),
 	REGULATOR_SUPPLY("vddio_hsic", NULL),
+        REGULATOR_SUPPLY("avdd_dsi_csi_1v2", NULL),//jimmy add
 };
 static struct regulator_consumer_supply tps6591x_ldo7_supply_0[] = {
 	REGULATOR_SUPPLY("avdd_plla_p_c_s", NULL),
@@ -202,7 +197,6 @@ TPS_PDATA_INIT(vio,  0,         1500, 3300, 0, 1, 1, 0, -1, 0, 0, 0, 0);
 TPS_PDATA_INIT(ldo1, 0,         1000, 3300, tps6591x_rails(VDD_2), 1, 0, 0, -1, 1, 1, 0, 0);
 TPS_PDATA_INIT(ldo2, 0,         1050, 3300, tps6591x_rails(VDD_2), 0, 0, 1, -1, 0, 1, 0, 0);
 
-TPS_PDATA_INIT(ldo3, e118x,     1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0);
 TPS_PDATA_INIT(ldo3, e1198,     1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0);
 TPS_PDATA_INIT(ldo4, 0,         1000, 3300, 0, 1, 0, 0, -1, 0, 0, 0, 0);
 TPS_PDATA_INIT(ldo5, e118x,     1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0);
@@ -245,7 +239,6 @@ static struct tps6591x_rtc_platform_data rtc_data = {
 	TPS_REG(VDDCTRL, vddctrl, 0),		\
 	TPS_REG(LDO_1, ldo1, 0),		\
 	TPS_REG(LDO_2, ldo2, 0),		\
-	TPS_REG(LDO_3, ldo3, e118x),		\
 	TPS_REG(LDO_4, ldo4, 0),		\
 	TPS_REG(LDO_5, ldo5, e118x),		\
 	TPS_REG(LDO_6, ldo6, 0),		\
@@ -475,8 +468,6 @@ int __init cardhu_regulator_init(void)
 			tps_platform.subdevs = tps_devs_e1198_skubit0_0;
 		}
 	} else {
-		if (board_info.board_id == BOARD_PM269)
-			pdata_ldo3_e118x.slew_rate_uV_per_us = 250;
 
 		if (pmu_board_info.sku & SKU_DCDC_TPS62361_SUPPORT) {
 			tps_platform.num_subdevs = ARRAY_SIZE(tps_devs_e118x_skubit0_1);
@@ -1241,32 +1232,11 @@ int __init cardhu_suspend_init(void)
 int __init cardhu_edp_init(void)
 {
 
-	unsigned int project_id = tegra3_get_project_id();
 	unsigned int current_mA = 0;
 
-	switch (project_id) {
-	case TEGRA3_PROJECT_TF201:
-		current_mA = 5000;
-		break;
-	case TEGRA3_PROJECT_TF300T:
-	case TEGRA3_PROJECT_TF300TG:
-	case TEGRA3_PROJECT_TF300TL:
-	case TEGRA3_PROJECT_TF500T:
-	case TEGRA3_PROJECT_ME301T:
-	case TEGRA3_PROJECT_ME301TL:
-		current_mA = 6000;
-		break;
-	case TEGRA3_PROJECT_ME570T:
-		current_mA = 8200;
-		break;
-	case TEGRA3_PROJECT_TF700T:
-	case TEGRA3_PROJECT_P1801:
-		current_mA = 10000;
-		break;
-	default:
-		pr_info("%s: cannot match edp limit\n", __func__);
-		break;
-
+	current_mA = get_maximum_cpu_current_supported();
+	if (!current_mA) {
+		current_mA = 6000; /* regular T30/s */
 	}
 
 	pr_info("%s : use asus edp policy with %u mA\n", __func__, current_mA);

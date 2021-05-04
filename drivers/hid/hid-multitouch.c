@@ -749,7 +749,6 @@ static const struct hid_device_id mt_devices[] = {
 	{ .driver_data = MT_CLS_DEFAULT,
 		HID_USB_DEVICE(USB_VENDOR_ID_XAT,
 			USB_DEVICE_ID_XAT_CSR) },
-
 	{ }
 };
 MODULE_DEVICE_TABLE(hid, mt_devices);

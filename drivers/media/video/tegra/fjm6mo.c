@@ -95,7 +95,7 @@ static u8 fw_chip_erase_pin3[16] = {
     0xff, 0x00, 0x20, 0x11, 0x00, 0x00, 0xff, 0xff
 };
 
-int tegra_camera_mclk_on_off(int on);
+//int tegra_camera_mclk_on_off(int on);
 int yuv_sensor_power_on_reset_pin(void);
 int yuv_sensor_power_off_reset_pin(void);
 static int sensor_change_status(E_M6MO_Status status);
@@ -386,7 +386,7 @@ static int isp_power_on()
         return -ENOMEM;
 
     info->pdata->power_on();
-    tegra_camera_mclk_on_off(1);
+    //tegra_camera_mclk_on_off(1);
     yuv_sensor_power_on_reset_pin();
     return 0;
 }
@@ -397,7 +397,7 @@ static int isp_power_off()
 
     shading_table = 0;
     yuv_sensor_power_off_reset_pin();
-    tegra_camera_mclk_on_off(0);
+    //tegra_camera_mclk_on_off(0);
     info->pdata->power_off();
     return 0;
 }

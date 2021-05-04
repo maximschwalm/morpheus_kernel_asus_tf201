@@ -1,8 +1,8 @@
 #ifndef _ELAN_I2C_ASUS_H
 #define _ELAN_I2C_ASUS_H
-
-#include "asusdec.h"
-
+//[Brook- Docking charging porting]>>
+#include "asuspec.h"
+//[Brook- Docking charging porting]<<
 #define ELAN_DEBUG			0
 #if ELAN_DEBUG
 #define ELAN_INFO(format, arg...)	\

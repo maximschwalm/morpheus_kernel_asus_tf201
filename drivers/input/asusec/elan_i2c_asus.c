@@ -10,7 +10,7 @@
 #include <linux/workqueue.h>
 #include <linux/cdev.h>
 #include <linux/gpio_event.h>
-#include <linux/earlysuspend.h>
+//#include <linux/earlysuspend.h>
 #include <linux/freezer.h>
 #include <linux/time.h>
 #include <linux/timer.h>
@@ -48,9 +48,9 @@ static int elan_i2c_asus_cmd(struct i2c_client *client,unsigned char *param, int
 			ELAN_ERR("Fail to read data, status %d\n", ret);
 			return ret;
 		}
-		ASUSDEC_I2C_DATA(i2c_data, index);
-		if ((i2c_data[1] & ASUSDEC_OBF_MASK) &&
-			(i2c_data[1] & ASUSDEC_AUX_MASK)){
+		ASUSPEC_I2C_DATA(i2c_data, index);
+		if ((i2c_data[1] & ASUSPEC_OBF_MASK) &&
+			(i2c_data[1] & ASUSPEC_AUX_MASK)){
 			if (i2c_data[2] == PSMOUSE_RET_ACK){
 				break;
 			}

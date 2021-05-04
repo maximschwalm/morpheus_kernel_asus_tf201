@@ -148,6 +148,8 @@ static bool is_support_dock(void)
 	unsigned tf300tg_hw = -1;
 	bool support_dock = false;
 
+        return true;//frank
+
 	project_info = tegra3_get_project_id();
 	tf300tg_hw = tegra3_query_audio_codec_pcbid();
 
@@ -438,14 +440,14 @@ static int btn_config_gpio()
 	ret = gpio_request(HOOK_GPIO, "btn_INT");
 	ret = gpio_direction_input(HOOK_GPIO);
 
-	if(project_info == TEGRA3_PROJECT_ME301T ||
-			project_info == TEGRA3_PROJECT_ME301TL)
-	{
+	//if(project_info == TEGRA3_PROJECT_ME301T ||
+	//		project_info == TEGRA3_PROJECT_ME301TL)
+	//{
 		hook_irq = TEGRA_GPIO_TO_IRQ(HOOK_GPIO);
 		ret = request_irq(hook_irq, hook_irq_handler,
 				IRQF_TRIGGER_FALLING, "hook_detect", NULL);
 		disable_irq(hook_irq);
-	}
+	//}
 
 	return 0;
 }
@@ -462,6 +464,8 @@ static void hook_work_queue(struct work_struct *work)
 static void lineout_work_queue(struct work_struct *work)
 {
 	msleep(300);
+
+        printk("%s: lineout work queue \n",__func__);
 
 	if(!is_support_dock()){
 		printk("%s: Not support dock\n",__func__);
@@ -603,74 +607,32 @@ static irqreturn_t detect_irq_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+//frank
 static int codec_micbias_power(int on)
 {
 	unsigned int CtrlReg = 0;
 
 	if(on){
-		if(project_info == TEGRA3_PROJECT_TF201 || project_info == TEGRA3_PROJECT_TF300TG ||
-				project_info == TEGRA3_PROJECT_TF700T || project_info == TEGRA3_PROJECT_TF300TL)
-		{
-			if(rt5631_audio_codec == NULL){
-				printk("%s: No rt5631 rt5631_audio_codec - set micbias on fail\n", __func__);
-				return 0;
-			}
-			/* Mic Bias enable */
-			CtrlReg = snd_soc_read(rt5631_audio_codec, 0x3B);
-			CtrlReg = CtrlReg | (1 << 3);
-			snd_soc_write(rt5631_audio_codec, 0x3B, CtrlReg);
-		}else if(project_info == TEGRA3_PROJECT_TF300T){
-			if(wm8903_codec == NULL){
-				printk("%s: No wm8903_codec - set micbias on fail\n", __func__);
-				return 0;
-			}
-			CtrlReg = MICBIAS_ENA | MICDET_ENA;
-			snd_soc_write(wm8903_codec, WM8903_MIC_BIAS_CONTROL_0, CtrlReg);
-		}else if(project_info == TEGRA3_PROJECT_TF500T || project_info == TEGRA3_PROJECT_P1801 ||
-				project_info == TEGRA3_PROJECT_ME301T ||
-				project_info == TEGRA3_PROJECT_ME301TL ||
-				project_info == TEGRA3_PROJECT_ME570T){
-			if(rt5640_audio_codec == NULL){
-				printk("%s: No RT5642_codec - set micbias on fail\n", __func__);
-				return 0;
-			}
-			 /* Ensure the power is strong enough to drive MicBias2 */
-			snd_soc_update_bits(rt5640_audio_codec, RT5640_PWR_ANLG1,
-					     RT5640_PWR_MB | RT5640_PWR_VREF2,
-					     RT5640_PWR_MB | RT5640_PWR_VREF2);
-			snd_soc_update_bits(rt5640_audio_codec, RT5640_PWR_ANLG1, RT5640_PWR_LDO2, RT5640_PWR_LDO2); /* Enable LDO2 */
-			snd_soc_update_bits(rt5640_audio_codec, RT5640_PWR_ANLG2, RT5640_PWR_MB1, RT5640_PWR_MB1); /*Enable MicBias1 */
-		}
+            
+
+                       if(rt5640_audio_codec == NULL){
+                                printk("%s: No RT5642_codec - set micbias on fail\n", __func__);
+                                return 0;
+                        }
+                         /* Ensure the power is strong enough to drive MicBias2 */
+                        snd_soc_update_bits(rt5640_audio_codec, RT5640_PWR_ANLG1,
+                                             RT5640_PWR_MB | RT5640_PWR_VREF2,
+                                             RT5640_PWR_MB | RT5640_PWR_VREF2);
+                        snd_soc_update_bits(rt5640_audio_codec, RT5640_PWR_ANLG1, RT5640_PWR_LDO2, RT5640_PWR_LDO2); /* Enable LDO2 */
+                        snd_soc_update_bits(rt5640_audio_codec, RT5640_PWR_ANLG2, RT5640_PWR_MB1, RT5640_PWR_MB1); /*Enable MicBias1 */
+
 	}else{
-		if(project_info == TEGRA3_PROJECT_TF201 || project_info == TEGRA3_PROJECT_TF300TG ||
-				project_info == TEGRA3_PROJECT_TF700T || project_info == TEGRA3_PROJECT_TF300TL)
-		{
-			if(rt5631_audio_codec == NULL){
-				printk("%s: No rt5631 rt5631_audio_codec - set micbias off fail\n", __func__);
-				return 0;
-			}
-			/* Mic Bias diable*/
-			CtrlReg = snd_soc_read(rt5631_audio_codec, 0x3B);
-			CtrlReg = CtrlReg & (0xFFFFFFF7);
-			snd_soc_write(rt5631_audio_codec, 0x3B, CtrlReg);
-		}else if(project_info == TEGRA3_PROJECT_TF300T){
-			if(wm8903_codec == NULL){
-				printk("%s: No wm8903_codec - set micbias off fail\n", __func__);
-				return 0;
-			}
-			CtrlReg = 0;
-			snd_soc_write(wm8903_codec, WM8903_MIC_BIAS_CONTROL_0, CtrlReg);
-		}else if(project_info == TEGRA3_PROJECT_TF500T || project_info == TEGRA3_PROJECT_P1801 ||
-				project_info == TEGRA3_PROJECT_ME301T ||
-				project_info == TEGRA3_PROJECT_ME301TL ||
-				project_info == TEGRA3_PROJECT_ME570T){
 			if(rt5640_audio_codec == NULL){
 				printk("%s: No RT5642_codec - set micbias on fail\n", __func__);
 				return 0;
 			}
 			snd_soc_update_bits(rt5640_audio_codec, RT5640_PWR_ANLG2, RT5640_PWR_MB1, 0); /* Disable MicBias1 */
 			snd_soc_update_bits(rt5640_audio_codec, RT5640_PWR_ANLG1, RT5640_PWR_LDO2, 0); /* Disable LDO2 */
-		}
 	}
 	return 0;
 }
@@ -708,8 +670,9 @@ static int __init headset_init(void)
 
 	printk("HEADSET: Headset detection init\n");
 
-	console_disable = is_tegra_debug_uartport_hs();
-	project_info = tegra3_get_project_id();
+	//console_disable = is_tegra_debug_uartport_hs();
+	console_disable = false;//frank
+        project_info = tegra3_get_project_id();
 
 	hs_data = kzalloc(sizeof(struct headset_data), GFP_KERNEL);
 	if (!hs_data)
@@ -740,36 +703,38 @@ static int __init headset_init(void)
 	printk("HEADSET: Headset detection mode\n");
 	btn_config_gpio();/*Config hook detection GPIO*/
 
-	if(project_info == TEGRA3_PROJECT_ME301T ||
-			project_info == TEGRA3_PROJECT_ME301TL ||
-			project_info == TEGRA3_PROJECT_ME570T)
-		switch_config_gpio(); /*Config uart and headphone switch*/
+	//if(project_info == TEGRA3_PROJECT_ME301T ||
+	//		project_info == TEGRA3_PROJECT_ME301TL ||
+	//		project_info == TEGRA3_PROJECT_ME570T)
+	//	switch_config_gpio(); /*Config uart and headphone switch*/
+        //frank
+
 	wake_lock_init(&hp_detect_wakelock, WAKE_LOCK_SUSPEND,
 		"headset detection");
 	INIT_WORK(&lineout_work, lineout_work_queue);
-	if (project_info ==  TEGRA3_PROJECT_ME301T ||
-		project_info == TEGRA3_PROJECT_ME301TL)
-		INIT_WORK(&hook_work, hook_work_queue);
+	//if (project_info ==  TEGRA3_PROJECT_ME301T ||
+	//	project_info == TEGRA3_PROJECT_ME301TL)
+		INIT_WORK(&hook_work, hook_work_queue);//frank
 
-	switch (project_info) {
-		case TEGRA3_PROJECT_TF201:
-		case TEGRA3_PROJECT_TF300T:
-		case TEGRA3_PROJECT_TF300TG:
-		case TEGRA3_PROJECT_TF300TL:
-		case TEGRA3_PROJECT_TF500T:
-		case TEGRA3_PROJECT_TF700T:
+	//switch (project_info) {
+	//	case TEGRA3_PROJECT_TF201:
+	//	case TEGRA3_PROJECT_TF300T:
+	//	case TEGRA3_PROJECT_TF300TG:
+	//	case TEGRA3_PROJECT_TF300TL:
+	//	case TEGRA3_PROJECT_TF500T:
+	//	case TEGRA3_PROJECT_TF700T:
 			hs_data->lineout_gpio = LINEOUT_GPIO;
 			lineout_config_gpio();
-			break;
-		case TEGRA3_PROJECT_ME301T:
-			hs_data->lineout_gpio = LINEOUT_ME301T;
-			lineout_config_no_dock();
-			break;
-		default:
-			hs_data->lineout_gpio = LINEOUT_GPIO;
-			lineout_config_gpio();
-			break;
-	}
+	//		break;
+	//	case TEGRA3_PROJECT_ME301T:
+	//		hs_data->lineout_gpio = LINEOUT_ME301T;
+	//		lineout_config_no_dock();
+	//		break;
+	//	default:
+	//		hs_data->lineout_gpio = LINEOUT_GPIO;
+	//		lineout_config_gpio();
+	//		break;
+	//}
 
 	jack_config_gpio();/*Config jack detection GPIO*/
 

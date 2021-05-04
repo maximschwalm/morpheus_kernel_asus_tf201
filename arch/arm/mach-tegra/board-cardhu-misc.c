@@ -39,12 +39,12 @@ static struct kobj_attribute module##_attr = { \
 static unsigned int cardhu_pcbid;
 
 static const struct pins cardhu_pcbid_pins[] = {
-	{TEGRA_GPIO_PR4, TEGRA_PINGROUP_KB_ROW4, "PCB_ID0", false, false},
-	{TEGRA_GPIO_PR5, TEGRA_PINGROUP_KB_ROW5, "PCB_ID1", false, false},
-	{TEGRA_GPIO_PQ4, TEGRA_PINGROUP_KB_COL4, "PCB_ID2", false, false},
-	{TEGRA_GPIO_PQ7, TEGRA_PINGROUP_KB_COL7, "PCB_ID3", false, false},
-	{TEGRA_GPIO_PR2, TEGRA_PINGROUP_KB_ROW2, "PCB_ID4", false, false},
-	{TEGRA_GPIO_PQ5, TEGRA_PINGROUP_KB_COL5, "PCB_ID5", false, false},
+	{TEGRA_GPIO_PR0, TEGRA_PINGROUP_KB_ROW0, "PCB_ID0", false, false},
+	{TEGRA_GPIO_PR1, TEGRA_PINGROUP_KB_ROW1, "PCB_ID1", false, false},
+	{TEGRA_GPIO_PR2, TEGRA_PINGROUP_KB_ROW2, "PCB_ID2", false, false},
+	{TEGRA_GPIO_PR3, TEGRA_PINGROUP_KB_ROW3, "PCB_ID3", false, false},
+	{TEGRA_GPIO_PR4, TEGRA_PINGROUP_KB_ROW4, "PCB_ID4", false, false},
+	{TEGRA_GPIO_PR5, TEGRA_PINGROUP_KB_ROW5, "PCB_ID5", false, false},
 	{TEGRA_GPIO_PJ0, TEGRA_PINGROUP_GMI_CS0_N, "PCB_ID6", false, false},
 	{TEGRA_GPIO_PJ2, TEGRA_PINGROUP_GMI_CS1_N, "PCB_ID7", false, false},
 	{TEGRA_GPIO_PK3, TEGRA_PINGROUP_GMI_CS2_N, "PCB_ID8", false, false},
@@ -81,6 +81,8 @@ static const char *tegra3_project_name[TEGRA3_PROJECT_MAX] = {
 	[TEGRA3_PROJECT_ME301T] = "ME301T",
 	[TEGRA3_PROJECT_ME301TL] = "ME301TL",
 	[TEGRA3_PROJECT_ME570T] = "ME570T",
+	[TEGRA3_PROJECT_TF502T] = "TF502T",
+	[TEGRA3_PROJECT_TF502TG] = "TF502TG",
 };
 
 static unsigned int tegra3_project_name_index = TEGRA3_PROJECT_INVALID;
@@ -118,6 +120,10 @@ const char *tegra3_get_project_name(void)
 			project_id = 8 + HW_DRF_VAL(TEGRA3_DEVKIT, MISC_HW,
 				EXTENDED_PROJECT, cardhu_extended_projectid);
 
+                if (project_id != tegra3_project_name_index) {
+                        project_id = 13 - tegra3_project_name_index;
+                }
+
 		/* WARN if project id was not matched with PCBID */
 		WARN_ONCE(project_id != tegra3_project_name_index,
 			"[MISC]: project ID in kernel cmdline was not matched"
@@ -145,6 +151,10 @@ unsigned int tegra3_get_project_id(void)
 			project_id = 8 + HW_DRF_VAL(TEGRA3_DEVKIT, MISC_HW,
 				EXTENDED_PROJECT, cardhu_extended_projectid);
 
+                if ((project_id != TEGRA3_PROJECT_EXTENSION)) {
+                        project_id = 13 - tegra3_project_name_index;
+                }
+
 		/* WARN if project id was not matched with PCBID */
 		WARN_ONCE(project_id != tegra3_project_name_index,
 			"[MISC]: project ID in kernel cmdline was not matched"
@@ -154,6 +164,7 @@ unsigned int tegra3_get_project_id(void)
 		pr_info("[MISC]: adopt kernel cmdline prior to %s ready.\n",
 				__func__);
 	}
+
 	return (project_id < TEGRA3_PROJECT_MAX) ?
 		project_id : TEGRA3_PROJECT_INVALID;
 

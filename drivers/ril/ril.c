@@ -40,7 +40,6 @@ static dev_t ril_dev;
 static int ril_major = 0;
 static int ril_minor = 0;
 int project_id = 0;
-extern void tegra_ehci_modem_port_host_reregister(void);
 
 static struct platform_device ril_device = {
 	.name = "ril",
@@ -170,17 +169,6 @@ static ssize_t store_download_state(struct device *class, struct device_attribut
 	return store_gpio(count, buf, DL_MODE, "DL_MODE");
 }
 
-static ssize_t store_mod_host_controller_rst(struct device *class, struct attribute *attr,
-		const char *buf, size_t count)
-{
-	int state;
-
-	sscanf(buf, "%d", &state);
-	if ((state > 0) && (project_id == TEGRA3_PROJECT_TF300TL))
-		tegra_ehci_modem_port_host_reregister();
-
-	return count;
-}
 
 //**** sysfs list
 /* TF300TG sysfs array */
@@ -195,7 +183,6 @@ static struct device_attribute device_attr_TF300TL[] = {
 	__ATTR(vbat, _ATTR_MODE, show_vbat_state, store_vbat_state),
 	__ATTR(mod_rst, _ATTR_MODE, show_reset_state, store_reset_state),
 	__ATTR(dl_mode, _ATTR_MODE, show_download_state, store_download_state),
-	__ATTR(mod_host_controller_rst, _ATTR_MODE, NULL, store_mod_host_controller_rst),
 	__ATTR_NULL,
 };
 

@@ -31,9 +31,9 @@ static void vibrator_enable(struct timed_output_dev *dev, int value)
 		del_timer_sync(&v_timer);//delete the last timer.
 		v_timer.expires = jiffies + msecs_to_jiffies(value);
 		add_timer(&v_timer);
-		gpio_set_value(TEGRA_GPIO_PH7, 1);
+		gpio_set_value(TEGRA_GPIO_PH3, 1);
         } else {
-		gpio_set_value(TEGRA_GPIO_PH7, 0);
+		gpio_set_value(TEGRA_GPIO_PH3, 0);
 	}
 
 }
@@ -52,7 +52,7 @@ static struct timed_output_dev tegra_vibrator = {
 };
 static void stop_vibrator(void)
 {
-	gpio_direction_output(TEGRA_GPIO_PH7, 0);
+	gpio_direction_output(TEGRA_GPIO_PH3, 0);
 }
 static int __init vibrator_init(void)
 {
@@ -61,21 +61,26 @@ static int __init vibrator_init(void)
 	 * Use GMI_AD15 pin as a software-controlled GPIO
 	 * to control vibrator
 	 */
-	u32 project_info = tegra3_get_project_id();
+	//Chis_Lin add for TF600T porting start mark project_info
+	/*u32 project_info = tegra3_get_project_id();
         if(project_info != TEGRA3_PROJECT_TF201 &&
 	    project_info != TEGRA3_PROJECT_TF700T)
-		return 0;
+		return 0;*/
+	//Chis_Lin add for TF600T porting start mark project_info
 
 	printk(KERN_INFO "%s+ #####\n", __func__);
-	ret = gpio_request(TEGRA_GPIO_PH7, "ENB_VIB");
+	//Chis_Lin add for TF600T porting start
+	gpio_free(TEGRA_GPIO_PH3);
+	//Chis_Lin add for TF600T porting end
+	ret = gpio_request(TEGRA_GPIO_PH3, "ENB_VIB");
 	if (ret) {
 		pr_info("[VIB]: gpio_request failed.\n");
-		gpio_free(TEGRA_GPIO_PH7);
+		gpio_free(TEGRA_GPIO_PH3);
 		return ret;
 	}
 
 	/* Turn off vibrator in default*/
-	gpio_direction_output(TEGRA_GPIO_PH7, 0);
+	gpio_direction_output(TEGRA_GPIO_PH3, 0);
 
 	init_timer(&v_timer);
 	v_timer.expires = jiffies;

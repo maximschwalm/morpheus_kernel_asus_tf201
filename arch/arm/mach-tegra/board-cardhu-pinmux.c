@@ -224,7 +224,7 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux_common[] = {
 	DEFAULT_PINMUX(ULPI_NXT,        UARTD,           NORMAL,    TRISTATE,     INPUT),
 	DEFAULT_PINMUX(ULPI_STP,        UARTD,           NORMAL,    TRISTATE,     OUTPUT),
 	DEFAULT_PINMUX(DAP3_FS,         I2S2,            NORMAL,    TRISTATE,     INPUT),
-	DEFAULT_PINMUX(DAP3_DIN,        I2S2,            NORMAL,    TRISTATE,     INPUT),
+	DEFAULT_PINMUX(DAP3_DIN,        I2S2,            PULL_UP,   NORMAL,     INPUT),
 	DEFAULT_PINMUX(DAP3_DOUT,       I2S2,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(DAP3_SCLK,       I2S2,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(GPIO_PV2,        RSVD1,           NORMAL,    NORMAL,     OUTPUT),
@@ -302,8 +302,8 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux_common[] = {
 	DEFAULT_PINMUX(KB_ROW15,        KBC,             PULL_UP,   NORMAL,     INPUT),
 	/* DOCK_IN# */
 	DEFAULT_PINMUX(GPIO_PU4,        RSVD1,           PULL_UP,   NORMAL,     INPUT),
-	/* HALL SENSOR, LID# */
-	DEFAULT_PINMUX(KB_ROW14,        KBC,             PULL_UP,   NORMAL,     INPUT),
+	/* Panda TF600T MP HALL SENSOR, LID# */
+	DEFAULT_PINMUX(GPIO_PBB6,        KBC,             PULL_UP,   NORMAL,     INPUT),
 
 #if 0 /* for testing on Verbier */
 	DEFAULT_PINMUX(GMI_WAIT,        NAND,            NORMAL,    NORMAL,     INPUT),
@@ -336,6 +336,7 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux_common[] = {
 	DEFAULT_PINMUX(GMI_DQS,         NAND,            NORMAL,    NORMAL,     INPUT),
 #else
 	DEFAULT_PINMUX(GMI_AD8,         PWM0,            NORMAL,    NORMAL,     OUTPUT), /* LCD1_BL_PWM */
+        //DEFAULT_PINMUX(GMI_AD9,         PWM1,            NORMAL,    NORMAL,     OUTPUT),  /* AVDD_CAM1_EN */
 #endif
 	DEFAULT_PINMUX(GMI_A16,         SPI4,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(GMI_A17,         SPI4,            NORMAL,    NORMAL,     INPUT),
@@ -360,10 +361,10 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux_common[] = {
 	DEFAULT_PINMUX(GPIO_PV0, RSVD, PULL_UP, TRISTATE, INPUT),
 
 	/* VOL_UP Key */
-	DEFAULT_PINMUX(KB_COL2,	RSVD, PULL_UP, TRISTATE, INPUT),
+	DEFAULT_PINMUX(KB_COL3,	RSVD, PULL_UP, TRISTATE, INPUT),
 
 	/* VOL_DOWN Key */
-	DEFAULT_PINMUX(KB_COL3,	RSVD, PULL_UP, TRISTATE, INPUT),
+	DEFAULT_PINMUX(KB_COL4,	RSVD, PULL_UP, TRISTATE, INPUT),
 
 	/* Start of PCBID pins */
 	//PCB_ID0
@@ -371,7 +372,7 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux_common[] = {
 	//PCB_ID1
 	DEFAULT_PINMUX(KB_ROW5, KBC, NORMAL, TRISTATE, INPUT),
 	//PCB_ID2
-	DEFAULT_PINMUX(KB_COL4, KBC, NORMAL, TRISTATE, INPUT),
+	//DEFAULT_PINMUX(KB_COL4, KBC, NORMAL, TRISTATE, INPUT),//weli revise
 	//PCB_ID3
 	DEFAULT_PINMUX(KB_COL7, KBC, NORMAL, TRISTATE, INPUT),
 	//PCB_ID4
@@ -462,7 +463,7 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux_common[] = {
 	DEFAULT_PINMUX(GMI_AD14,        NAND,            NORMAL,    NORMAL,     OUTPUT),
 
 	/* Vibrator control */
-	DEFAULT_PINMUX(GMI_AD15,        NAND,		 PULL_DOWN, NORMAL,	OUTPUT),
+	DEFAULT_PINMUX(GMI_AD11,        NAND,		 PULL_DOWN, NORMAL,	OUTPUT),
 
 	/* Power rails GPIO */
 	DEFAULT_PINMUX(SPI2_SCK,        GMI,             NORMAL,    NORMAL,     INPUT),
@@ -478,14 +479,15 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux_common[] = {
 	VI_PINMUX(VI_HSYNC,        RSVD1,           NORMAL,    NORMAL,     INPUT,  DISABLE, DISABLE),
 	VI_PINMUX(VI_VSYNC,        RSVD1,           NORMAL,    NORMAL,     INPUT,  DISABLE, DISABLE),
 
-	/*bat detection*/
-	DEFAULT_PINMUX(LCD_CS0_N,       DISPLAYA,        NORMAL,    TRISTATE,     INPUT),
-	/*low low bat detection*/
-	DEFAULT_PINMUX(KB_ROW12,        KBC,             NORMAL,    TRISTATE,     INPUT), 
 	/*PB_DIS*/
 	DEFAULT_PINMUX(KB_ROW13,        KBC,             NORMAL,   TRISTATE,     INPUT),
 	/*docking thermal pwr control*/
 	DEFAULT_PINMUX(GPIO_PU3,        RSVD1,           NORMAL,    NORMAL,     OUTPUT),
+	/*NFC*/
+	DEFAULT_PINMUX(DAP3_SCLK,       RSVD1,           NORMAL,    NORMAL,     OUTPUT),
+	DEFAULT_PINMUX(SPI2_MOSI,       SPI2,            NORMAL,    NORMAL,     INPUT),
+	DEFAULT_PINMUX(ULPI_DATA5,      UARTA,           NORMAL,    NORMAL,     OUTPUT),
+
 };
 
 static __initdata struct tegra_pingroup_config cardhu_pinmux_e118x[] = {
@@ -745,6 +747,11 @@ static __initdata struct tegra_pingroup_config pinmux_P1801[] = {
 	DEFAULT_PINMUX(KB_ROW8,         KBC,             NORMAL,   NORMAL,     OUTPUT),
 };
 
+static __initdata struct tegra_pingroup_config pinmux_TF600T[] = {
+	/*TP_PWR*/
+      DEFAULT_PINMUX(KB_ROW7, KBC, NORMAL, NORMAL, OUTPUT),	
+};
+
 static void __init cardhu_pinmux_audio_init(void)
 {
 	gpio_request(TEGRA_GPIO_CDC_IRQ, "wm8903");
@@ -789,7 +796,6 @@ static struct gpio_init_pin_info init_gpio_mode_pm269_TF300TL[] = {
 static struct gpio_init_pin_info init_gpio_mode_pm269_TF300TG[] = {
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PC6, false, 0),
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PD2, false, 0),
-	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PP1, false, 0),
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PX5, false, 0),
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PW3, false, 0),
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PR3, false, 0),
@@ -971,6 +977,8 @@ int __init cardhu_pinmux_init(void)
 		cardhu_pinmux_audio_init();
 	}
 
+      	tegra_pinmux_config_table(pinmux_TF600T,
+					ARRAY_SIZE(pinmux_TF600T));
 	return 0;
 }
 

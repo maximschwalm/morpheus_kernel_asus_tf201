@@ -1089,7 +1089,7 @@ static int sensor_write_table_ex(struct i2c_client *client,
 
 /* debugfs+ */
 /* --- mi1040_chip_id --- */
-int tegra_camera_mclk_on_off(int on);
+//int tegra_camera_mclk_on_off(int on);
 
 static ssize_t dbg_mi1040_chip_id_open(struct inode *inode, struct file *file)
 {
@@ -1121,7 +1121,7 @@ static ssize_t dbg_mi1040_chip_id_read(struct file *file, char __user *buf, size
 			len = snprintf(bp, dlen, "mi1040 info isn't enough for power_on.\n");
 			tot += len; bp += len; dlen -= len;
 		}
-		tegra_camera_mclk_on_off(1);
+		//tegra_camera_mclk_on_off(1);
 	}
 
 	err = sensor_read_reg_word(info->i2c_client, 0x0, &chip_id);
@@ -1129,7 +1129,7 @@ static ssize_t dbg_mi1040_chip_id_read(struct file *file, char __user *buf, size
 	tot += len; bp += len; dlen -= len;
 
 	if (sensor_opened == false) {
-		tegra_camera_mclk_on_off(0);
+		//tegra_camera_mclk_on_off(0);
 
 		if (info->pdata && info->pdata->power_off) {
 			info->pdata->power_off();

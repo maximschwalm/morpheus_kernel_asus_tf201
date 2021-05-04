@@ -29,7 +29,6 @@
 #include <mach/clk.h>
 #include <mach/iomap.h>
 #include <mach/pinmux.h>
-#include <mach/board-cardhu-misc.h>
 #include "tegra_usb_phy.h"
 #include "gpio-names.h"
 #include "baseband-xmm-power.h"
@@ -1129,23 +1128,8 @@ static int utmi_phy_open(struct tegra_usb_phy *phy)
 	phy->utmi_xcvr_setup = utmi_phy_xcvr_setup_value(phy);
 
 	if (phy->inst == 0 || phy->inst == 2) {
-		if (tegra3_get_project_id() == TEGRA3_PROJECT_TF201) {
-			if (phy->utmi_xcvr_setup >= 48) {
-				phy->utmi_xcvr_setup = phy->utmi_xcvr_setup - 48;
-			} else {
-				phy->utmi_xcvr_setup = 0;
-			}
-		} else {
-			phy->utmi_xcvr_setup = phy->utmi_xcvr_setup + 8;
-			if (phy->utmi_xcvr_setup > 63)
-				phy->utmi_xcvr_setup = 63;
-		}
-		pr_info("phy->inst = %d, phy->utmi_xcvr_setup = %d\n", phy->inst, phy->utmi_xcvr_setup);
-	}
-
-	if(phy->inst == 1 && tegra3_get_project_id() == TEGRA3_PROJECT_P1801) {
-		phy->utmi_xcvr_setup = phy->utmi_xcvr_setup + 9;
-		if(phy->utmi_xcvr_setup > 63)
+		phy->utmi_xcvr_setup = phy->utmi_xcvr_setup + 8;
+		if (phy->utmi_xcvr_setup > 63)
 			phy->utmi_xcvr_setup = 63;
 		pr_info("phy->inst = %d, phy->utmi_xcvr_setup = %d\n", phy->inst, phy->utmi_xcvr_setup);
 	}

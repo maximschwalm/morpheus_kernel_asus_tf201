@@ -80,6 +80,8 @@
 #include "pm.h"
 #include "baseband-xmm-power.h"
 #include "wdt-recovery.h"
+#include <linux/nfc/pn544.h>
+#include <linux/i2c/i2c-hid.h>
 
 #define CODEC_RT5642_RESET	TEGRA_GPIO_PP2
 
@@ -318,6 +320,20 @@ static __initdata struct tegra_clk_init_table cardhu_clk_init_table[] = {
 	{ NULL,		NULL,		0,		0},
 };
 
+static struct pn544_i2c_platform_data nfc_pdata = {
+	.irq_gpio = TEGRA_GPIO_PX0,
+	.ven_gpio = TEGRA_GPIO_PP3,
+	.firm_gpio = TEGRA_GPIO_PO6,
+};
+
+static struct i2c_board_info __initdata cardhu_i2c_bus3_board_info[] = {
+	{
+		I2C_BOARD_INFO("pn544", 0x28),
+		.platform_data = &nfc_pdata,
+		.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PX0),
+	},
+};
+
 static struct tegra_i2c_platform_data cardhu_i2c1_platform_data = {
 	.adapter_nr	= 0,
 	.bus_count	= 1,
@@ -526,10 +542,10 @@ static struct i2c_board_info __initdata cardhu_codec_max98095_info = {
 
 static struct i2c_board_info __initdata cardhu_i2c_asuspec_info[] = {
 	{
-		I2C_BOARD_INFO("asuspec", 0x15),
+		I2C_BOARD_INFO("asuspec", 0x17),	//Carlilse changes to 0x17 for match EC FW
 	},
 	{
-		I2C_BOARD_INFO("asusdec", 0x19),
+		I2C_BOARD_INFO("asusdec", 0x14),
 	},
 };
 
@@ -577,20 +593,12 @@ static void cardhu_i2c_init(void)
 	//i2c_register_board_info(4, &cardhu_codec_max98095_info, 1);
 	//i2c_register_board_info(4, &cardhu_codec_aic326x_info, 1);
 
-	switch(project_info){
-	case TEGRA3_PROJECT_TF201:
-	case TEGRA3_PROJECT_TF300TG:
-	case TEGRA3_PROJECT_TF700T:
-	case TEGRA3_PROJECT_TF300TL:
-	case TEGRA3_PROJECT_TF300T:
-	case TEGRA3_PROJECT_TF500T:
-		i2c_register_board_info(1, cardhu_i2c_asuspec_info, ARRAY_SIZE(cardhu_i2c_asuspec_info));
-	break;
-	case TEGRA3_PROJECT_P1801:
-		i2c_register_board_info(1, cardhu_i2c_aw8ec_info, ARRAY_SIZE(cardhu_i2c_aw8ec_info));
-	default:;
-	}
+	i2c_register_board_info(2, cardhu_i2c_bus3_board_info, 1);
+    i2c_register_board_info(0, cardhu_i2c_asuspec_info, ARRAY_SIZE(cardhu_i2c_asuspec_info));
 
+        i2c_register_board_info(4, &rt5642_board_info, 1);
+
+/*
 	switch (project_info) {
 		case TEGRA3_PROJECT_TF201:
 		case TEGRA3_PROJECT_TF300TG:
@@ -608,9 +616,10 @@ static void cardhu_i2c_init(void)
 		default:
 			break;
 	}
+*/
 
 #ifdef CONFIG_DSP_FM34
-	i2c_register_board_info(0, cardhu_dsp_board_info, 1);
+	//i2c_register_board_info(0, cardhu_dsp_board_info, 1);
 #endif
 }
 
@@ -861,7 +870,7 @@ static struct platform_device tegra_rtc_device = {
 };
 
 static struct tegra_asoc_platform_data cardhu_audio_wm8903_pdata = {
-	.gpio_spkr_en		= TEGRA_GPIO_SPKR_EN,
+	.gpio_spkr_en		= -1,
 	.gpio_hp_det		= TEGRA_GPIO_HP_DET,
 	.gpio_hp_mute		= -1,
 	.gpio_int_mic_en	= -1,
@@ -1196,6 +1205,20 @@ static struct i2c_board_info  sis9200_i2c2_boardinfo[] =
 	},
 };
 #endif
+
+static struct i2c_hid_platform_data usb_i2c_platform_data = {
+              .hid_descriptor_address = 0x0000,
+		  .rst_gpio = TEGRA_GPIO_PH6,
+		  .irq_gpio = TEGRA_GPIO_PH4,
+		  .tp_id_gpio[0] = TEGRA_GPIO_PK3,   // TP_ID1
+		  .tp_id_gpio[1] = TEGRA_GPIO_PK4}; // TP_ID2
+static struct i2c_board_info usb_i2c_boardinfo[] ={
+      {
+	  	I2C_BOARD_INFO("i2c_hid", 0x4B),
+             .platform_data = &usb_i2c_platform_data,
+             .irq = (INT_GPIO_BASE + TEGRA_GPIO_PH4),
+	},
+};
 static int __init cardhu_touch_init(void)
 {
 	struct board_info BoardInfo, DisplayBoardInfo;
@@ -1231,57 +1254,20 @@ static int __init cardhu_touch_init(void)
 			i2c_register_board_info(1, atmel_i2c_info, 1);
 	}
         */
-        if(project_id != TEGRA3_PROJECT_P1801){
-            gpio_request(TEGRA_GPIO_PH4, "touch-irq");
-            gpio_direction_input(TEGRA_GPIO_PH4);
-        }
 
+        
+        gpio_request(TEGRA_GPIO_PH4, "touch-irq");
+        gpio_direction_input(TEGRA_GPIO_PH4);
+        gpio_request(TEGRA_GPIO_PR7, "touch-power");
+        gpio_direction_output(TEGRA_GPIO_PR7, 1);
         gpio_request(TEGRA_GPIO_PH6, "touch-reset");
         gpio_direction_output(TEGRA_GPIO_PH6, 0);
-        msleep(1);
-        gpio_set_value(TEGRA_GPIO_PH6, 1);
+        msleep(10);
+        gpio_direction_output(TEGRA_GPIO_PR7, 0);
+	  msleep(10);
+        gpio_direction_output(TEGRA_GPIO_PH6, 1);
         msleep(100);
-        switch(project_id){
-	    case TEGRA3_PROJECT_TF201:
-#if defined (CONFIG_TOUCHSCREEN_ATMEL_MT_T9)
-	        i2c_register_board_info(1, atmel_i2c_info, 1);
-#endif
-	        break;
-	    case TEGRA3_PROJECT_P1801:
-	        gpio_request(TEGRA_GPIO_PS0, "tp_power");
-	        gpio_direction_output(TEGRA_GPIO_PS0, 1);
-	        gpio_request(TEGRA_GPIO_PR6, "tp_vendor");
-	        gpio_direction_input(TEGRA_GPIO_PR6);
-	        break;
-	    case TEGRA3_PROJECT_TF300T:
-	    case TEGRA3_PROJECT_TF300TG:
-	    case TEGRA3_PROJECT_TF300TL:
-#if defined(CONFIG_TOUCHSCREEN_ELAN_TF_3K)
-	        i2c_register_board_info(1, elan_i2c_devices, 1);
-#endif
-	        break;
-        case TEGRA3_PROJECT_ME301T:
-	        gpio_request(TEGRA_GPIO_PH5, "ts_power");
-	        gpio_direction_output(TEGRA_GPIO_PH5,0);
-	        gpio_request(TEGRA_GPIO_PI2, "tp_vendor_ID0");
-	        gpio_direction_input(TEGRA_GPIO_PI2);
-	        gpio_request(TEGRA_GPIO_PI4, "tp_vendor_ID1");
-	        gpio_direction_input(TEGRA_GPIO_PI4);
-#if defined(CONFIG_TOUCHSCREEN_SIS_I2C)
-	        i2c_register_board_info(1, sis9200_i2c2_boardinfo, 1);
-#endif
-	        break;
-	case TEGRA3_PROJECT_TF700T:
-	        gpio_request(TEGRA_GPIO_PK2, "tp_wake");
-	        gpio_direction_output(TEGRA_GPIO_PK2, 1);
-#if defined(CONFIG_TOUCHSCREEN_ELAN_TF_3K)
-	        platform = (struct elan_ktf3k_i2c_platform_data *)elan_i2c_devices[0].platform_data;
-	        platform->abs_x_max = ELAN_X_MAX_202T;
-	        platform->abs_y_max = ELAN_Y_MAX_202T;
-	        i2c_register_board_info(TOUCH_BUS_ATMEL_T9, elan_i2c_devices, 1);
-#endif
-	        break;
-	    }
+        i2c_register_board_info(1, usb_i2c_boardinfo, 1);
 	return 0;
 }
 
@@ -1600,62 +1586,13 @@ void tegra_cardhu_usb_utmip_host_unregister(struct platform_device *pdev)
 	platform_device_unregister(pdev);
 }
 
-struct platform_device *tegra_usb3_utmip_host_register(void)
-{
-	struct platform_device *pdev;
-	void *platform_data;
-	int val;
-
-	pdev = platform_device_alloc(tegra_ehci3_device.name, tegra_ehci3_device.id);
-	if (!pdev)
-		return NULL;
-
-	val = platform_device_add_resources(pdev, tegra_ehci3_device.resource, tegra_ehci3_device.num_resources);
-	if (val)
-		goto error;
-
-	pdev->dev.dma_mask =  tegra_ehci3_device.dev.dma_mask;
-	pdev->dev.coherent_dma_mask = tegra_ehci3_device.dev.coherent_dma_mask;
-
-	val = platform_device_add_data(pdev, &tegra_ehci3_utmi_pdata, sizeof(struct tegra_usb_platform_data));
-
-	if (val)
-		goto error;
-
-	val = platform_device_add(pdev);
-	if (val)
-		goto error;
-
-	return pdev;
-
-error:
-	pr_err("%s: failed to add the host contoller device\n", __func__);
-	platform_device_put(pdev);
-	return NULL;
-}
-
-void tegra_usb3_utmip_host_unregister(struct platform_device *pdev)
-{
-	platform_device_unregister(pdev);
-}
-
 #if defined(CONFIG_USB_SUPPORT)
 static void cardhu_usb_init(void)
 {
 	int ret;
 	struct board_info bi;
-	u32 project_info = tegra3_get_project_id();
 
 	tegra_get_board_info(&bi);
-
-	if (project_info == TEGRA3_PROJECT_P1801) {
-		ret = gpio_request(TEGRA_GPIO_PH7, "usb2_vbus_control");
-		if (ret < 0)
-			printk(KERN_ERR "%s: Failed to gpio_request for usb2_vbus_control.\n", __func__);
-		ret = gpio_direction_output(TEGRA_GPIO_PH7, 1);
-		if (ret)
-			printk(KERN_ERR "%s: Failed to gpio_direction_output for usb2_vbus_control.\n", __func__);
-	}
 
 	/* OTG should be the first to be registered */
 	tegra_otg_device.dev.platform_data = &tegra_otg_pdata;
@@ -1679,22 +1616,6 @@ static void cardhu_usb_init(void)
 		/* ehci2 registration happens in baseband-xmm-power  */
 	}
 
-	if (project_info == TEGRA3_PROJECT_TF300TL) {
-		printk("[TF300TL] register tegra_ehci2_device\n");
-		tegra_ehci2_device.dev.platform_data = &tegra_ehci2_utmi_pdata;
-		platform_device_register(&tegra_ehci2_device);
-	} else if (project_info == TEGRA3_PROJECT_P1801) {
-		printk("[P1801] register tegra_ehci2_device\n");
-		tegra_ehci2_utmi_pdata.u_data.host.hot_plug = true;
-		tegra_ehci2_device.dev.platform_data = &tegra_ehci2_utmi_pdata;
-		platform_device_register(&tegra_ehci2_device);
-	}else if (project_info == TEGRA3_PROJECT_TF300TG) {
-		printk("[TF300TG] register tegra_ehci2_device\n");
-		tegra_ehci2_utmi_pdata.u_data.host.power_off_on_suspend = false;
-		tegra_ehci2_device.dev.platform_data =  &tegra_ehci2_hsic_xmm_pdata;
-		/* ehci2 registration happens in baseband-xmm-power  */
-	}
-
 	tegra_ehci3_device.dev.platform_data = &tegra_ehci3_utmi_pdata;
 	platform_device_register(&tegra_ehci3_device);
 
@@ -1705,16 +1626,20 @@ static void cardhu_usb_init(void) { }
 
 static void cardhu_audio_init(void)
 {
-	struct board_info board_info;
-
-	unsigned int project_id = tegra3_get_project_id();
-
-	if (project_id == TEGRA3_PROJECT_ME301T) {
-		/* Set codec rt5642 in normal mode */
-		gpio_request(CODEC_RT5642_RESET, "codec_rt5642_reset");
+	int ret;
+	ret = gpio_request(CODEC_RT5642_RESET, "codec_rt5642_reset");
+	if (ret < 0){
+		pr_err("%s: gpio_request failed for gpio %d\n",__func__, CODEC_RT5642_RESET);
+	}
+	else{
+		//TF502: reset rt5642 LDO_EN pin when boot up.
+		gpio_direction_output(CODEC_RT5642_RESET, 0);
+		msleep(20);
 		gpio_direction_output(CODEC_RT5642_RESET, 1);
+                msleep(200);
 	}
 }
+
 
 static struct baseband_power_platform_data tegra_baseband_power_data = {
 	.baseband_type = BASEBAND_XMM,
@@ -1725,7 +1650,7 @@ static struct baseband_power_platform_data tegra_baseband_power_data = {
 			.bb_vbat = BB_GPIO_VBAT_ON,
 			.bb_rst_ind = BB_GPIO_RESET_IND,
 			.bb_vbus = BB_GPIO_VBUS_ON,
-			.bb_sw_sel = BB_GPIO_SW_SEL,
+//			.bb_sw_sel = BB_GPIO_SW_SEL,
 			.bb_sim_cd = BB_GPIO_SIM_DET,
 			.bb_sar_det = BB_GPIO_SAR_DET,
 			.ipc_bb_wake = XMM_GPIO_IPC_BB_WAKE,
@@ -1889,7 +1814,6 @@ static void ME301T_HWid_init(void)
 }
 static void __init tegra_cardhu_init(void)
 {
-        u32 project_info = tegra3_get_project_id();
 	/* input chip uid for initialization of kernel misc module */
 	cardhu_misc_init(tegra_chip_uid());
 	tegra_thermal_init(&thermal_data,
@@ -1917,8 +1841,6 @@ static void __init tegra_cardhu_init(void)
 	cardhu_suspend_init();
 	cardhu_touch_init();
 	cardhu_audio_init();
-	if (project_info == TEGRA3_PROJECT_TF300TG)
-		cardhu_modem_init();
 	cardhu_keys_init();
 	cardhu_panel_init();
 	cardhu_pmon_init();
@@ -1934,8 +1856,6 @@ static void __init tegra_cardhu_init(void)
 	cardhu_emc_init();
 	tegra_release_bootloader_fb();
 	cardhu_pci_init();
-	if(project_info == TEGRA3_PROJECT_ME301T)
-		ME301T_HWid_init();
 #ifdef CONFIG_TEGRA_WDT_RECOVERY
 	tegra_wdt_recovery_init();
 #endif

@@ -269,6 +269,8 @@ int tegra_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	unsigned long flags;
 	int i;
 
+        printk(KERN_INFO "%s : tegra_pcm_trigger \n", __func__);
+
 	dmap = snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
 	if (!dmap)
 		return 0;
@@ -288,6 +290,7 @@ int tegra_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 				(MAX_DMA_REQ_COUNT <= runtime->periods) ?
 				MAX_DMA_REQ_COUNT : runtime->periods;
 		}
+                printk("%s: pcm trigger start \n", __func__);
 		/* Fall-through */
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:

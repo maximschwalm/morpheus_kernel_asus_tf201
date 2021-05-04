@@ -87,6 +87,7 @@ static int asusdec_resume(struct i2c_client *client);
 static int asusdec_open(struct inode *inode, struct file *flip);
 static int asusdec_release(struct inode *inode, struct file *flip);
 static long asusdec_ioctl(struct file *flip, unsigned int cmd, unsigned long arg);
+static void asusdec_enter_factory_mode(void);
 static ssize_t ec_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
 static ssize_t ec_read(struct file *file, char __user *buf, size_t count, loff_t *ppos);
 static void BuffPush(char data);
@@ -132,7 +133,13 @@ EXPORT_SYMBOL(isDockIn);
 static unsigned int asusdec_apwake_gpio = TEGRA_GPIO_PS7;
 static unsigned int asusdec_ecreq_gpio = TEGRA_GPIO_PQ6;
 static unsigned int asusdec_dock_in_gpio = TEGRA_GPIO_PU4;
-static unsigned int asusdec_hall_sensor_gpio = TEGRA_GPIO_PS6;
+//Panda Porting TF600T MP Hall Sensor:--->
+//static unsigned int asusdec_hall_sensor_gpio = TEGRA_GPIO_PS6;
+static unsigned int asusdec_hall_sensor_gpio = TEGRA_GPIO_PBB6;
+//Panda Porting TF600T MP Hall Sensor:<---
+/*Chris start*/
+static unsigned int asuspec_kb_int_gpio = TEGRA_GPIO_PI6;
+/*Chris end*/
 
 static char host_to_ec_buffer[EC_BUFF_LEN];
 static char ec_to_host_buffer[EC_BUFF_LEN];
@@ -143,6 +150,9 @@ static int buff_out_ptr;	  // points to the first data
 static struct i2c_client dockram_client;
 static struct class *asusdec_class;
 static struct device *asusdec_device ;
+/*Chris start*/
+static struct i2c_client kb_client;
+/*Chris end*/
 static struct asusdec_chip *ec_chip;
 
 struct cdev *asusdec_cdev ;
@@ -246,9 +256,22 @@ static int asusdec_kp_sci_table[]={0, KEY_SLEEP, KEY_WLAN, KEY_BLUETOOTH,
 /*
  * functions definition
  */
+
+/*Chris start*/
+static void asuspec_kb_init(struct i2c_client *client){
+         kb_client.adapter = client->adapter;
+         kb_client.addr = 0x16;
+         kb_client.detected = client->detected;
+         kb_client.dev = client->dev;
+         kb_client.driver = client->driver;
+         kb_client.flags = client->flags;
+         strcpy(kb_client.name,client->name);
+}
+/*Chris end*/
+
 static void asusdec_dockram_init(struct i2c_client *client){
 	dockram_client.adapter = client->adapter;
-	dockram_client.addr = 0x1b;
+	dockram_client.addr = 0x15;
 	dockram_client.detected = client->detected;
 	dockram_client.dev = client->dev;
 	dockram_client.driver = client->driver;
@@ -639,6 +662,11 @@ static int asusdec_chip_init(struct i2c_client *client)
 
 	ec_chip->tf_dock = 1;
 
+#if FACTORY_MODE
+	if(factory_mode == 2)
+		asusdec_enter_factory_mode();
+#endif
+
 	if(asusdec_input_device_create(client)){
 		goto fail_to_access_ec;
 	}
@@ -731,6 +759,13 @@ static irqreturn_t asusdec_interrupt_handler(int irq, void *dev_id){
 	} else if (gpio == asusdec_hall_sensor_gpio){
 		queue_delayed_work(asusdec_wq, &ec_chip->asusdec_hall_sensor_work, 0);
 	}
+	/*Chris start*/
+        else if (gpio == asuspec_kb_int_gpio){
+                ASUSDEC_NOTICE("kb int = %d", irq);
+                disable_irq_nosync(irq);
+                queue_delayed_work(asusdec_wq, &ec_chip->asusdec_kb_report_work, 0);
+        }
+        /*Chris end*/
 	return IRQ_HANDLED;
 }
 
@@ -763,13 +798,16 @@ static int asusdec_irq_hall_sensor(struct i2c_client *client)
 		rc = -EIO;
 		goto err_gpio_request_irq_fail ;
 	}
-
+//Panda Porting TF600T MP Hall Sensor:--->
+  /*
 	if ((pad_pid == TEGRA3_PROJECT_TF300T) || (pad_pid == TEGRA3_PROJECT_TF300TG)){
 		ASUSDEC_NOTICE("Disable hall sensor wakeup function due to pid = %u\n", pad_pid);
 	} else {
 		enable_irq_wake(irq);
 	}
-
+	*/
+	enable_irq_wake(irq);
+//Panda Porting TF600T MP Hall Sensor:<---
 	ASUSDEC_INFO("LID irq = %d, rc = %d\n", irq, rc);
 
 	if (gpio_get_value(gpio)){
@@ -786,6 +824,53 @@ err_gpio_direction_input_failed:
 	return rc;
 }
 
+/*Chris start*/
+static int asuspec_irq_kb_int(struct i2c_client *client)
+{
+        int rc = 0 ;
+        unsigned gpio = asuspec_kb_int_gpio;
+        /*Chris start*/
+        gpio_free(gpio);
+        /*Chris end*/
+        int irq = gpio_to_irq(gpio);
+        const char* label = "asuspec_kb_int" ;
+
+        ASUSDEC_INFO("GPIO = %d, irq = %d\n", gpio, irq);
+        ASUSDEC_INFO("GPIO = %d , state = %d\n", gpio, gpio_get_value(gpio));
+
+        rc = gpio_request(gpio, label);
+        if (rc) {
+               ASUSDEC_ERR("gpio_request failed for input %d\n", gpio);
+               goto err_request_input_gpio_failed;
+        }
+
+        rc = gpio_direction_input(gpio) ;
+        if (rc) {
+		ASUSDEC_ERR("gpio_direction_input failed for input %d\n", gpio);
+                goto err_gpio_direction_input_failed;
+        }
+        ASUSDEC_INFO("GPIO = %d , state = %d\n", gpio, gpio_get_value(gpio));
+
+        rc = request_irq(irq, asusdec_interrupt_handler,/*IRQF_SHARED|IRQF_TRIGGER_RISING|IRQF_TRIGGER_FALLING|IRQF_TRIGGER_HIGH|*/IRQF_TRIGGER_LOW, label, client);
+        if (rc < 0) {
+                ASUSDEC_ERR("Could not register for %s interrupt, irq = %d, rc = %d\n", label, irq, rc);
+                rc = -EIO;
+                goto err_gpio_request_irq_fail ;
+        }
+
+        ASUSDEC_INFO("request irq = %d, rc = %d\n", irq, rc);
+
+        return 0 ;
+
+err_gpio_request_irq_fail:
+        gpio_free(gpio);
+err_gpio_direction_input_failed:
+err_request_input_gpio_failed :
+        return rc;
+
+        return 0 ;
+}
+/*Chris end*/
 
 static int asusdec_irq_dock_in(struct i2c_client *client)
 {
@@ -895,7 +980,99 @@ err_exit:
 	return rc;
 }
 
+/*Chris start*/
+static void asusdec_kb_report_work_function(struct work_struct *dat)
+{
+        int gpio = asuspec_kb_int_gpio;
+        int irq = gpio_to_irq(gpio);
+        int ret_val = 0;
+        int i = 0;
+        int scancode = 0;
+        
+        memset(&ec_chip->i2c_kb_data, 0, 32);
+        
+        ret_val = i2c_smbus_read_i2c_block_data(&kb_client, 0x73, 11, ec_chip->i2c_kb_data);
+        enable_irq(irq);
 
+        ASUSDEC_NOTICE("key code : 0x%x\n",ec_chip->i2c_kb_data[0]);
+        ASUSDEC_NOTICE("key code : 0x%x\n",ec_chip->i2c_kb_data[1]);
+        ASUSDEC_NOTICE("key code : 0x%x\n",ec_chip->i2c_kb_data[2]);
+        ASUSDEC_NOTICE("key code : 0x%x\n",ec_chip->i2c_kb_data[3]);
+        ASUSDEC_NOTICE("key code : 0x%x\n",ec_chip->i2c_kb_data[4]);
+        ASUSDEC_NOTICE("key code : 0x%x\n",ec_chip->i2c_kb_data[5]);
+	
+	scancode = ec_chip->i2c_kb_data[5];
+        ec_chip->keypad_data.extend = 0;
+        if(ec_chip->i2c_kb_data[5]==0){//not press key
+                if(ec_chip->i2c_kb_data[3]==0){//FIXME:key break
+                        ec_chip->keypad_data.value = 0;
+                        ASUSDEC_INFO("0 key break input_keycode = 0x%x, input_value = %d\n",
+                               ec_chip->keypad_data.input_keycode, ec_chip->keypad_data.value);
+                        input_report_key(ec_chip->indev,
+                               ec_chip->keypad_data.input_keycode, ec_chip->keypad_data.value);
+                        input_sync(ec_chip->indev);
+                        ec_chip->keypad_data.input_keycode = 0x00;
+                }else {//ctrl shift alt
+                       if(ec_chip->keypad_data.input_keycode != 0x00){//shift with break key
+                               ec_chip->keypad_data.value = 0;
+                               ASUSDEC_INFO("key break input_keycode = 0x%x, input_value = %d\n",
+                                       ec_chip->keypad_data.input_keycode, ec_chip->keypad_data.value);
+                               input_report_key(ec_chip->indev,
+                                        ec_chip->keypad_data.input_keycode, ec_chip->keypad_data.value);
+                               input_sync(ec_chip->indev);
+                               ec_chip->keypad_data.input_keycode = 0x00;
+			}
+                        ec_chip->keypad_data.value = 1;
+                        switch(ec_chip->i2c_kb_data[3]){
+                        case ASUSDEC_KEYPAD_LEFTCTRL:
+                                ec_chip->keypad_data.input_keycode = KEY_LEFTCTRL;
+                                break;
+                        case ASUSDEC_KEYPAD_KEY_LEFTSHIFT:
+                                ec_chip->keypad_data.input_keycode = KEY_LEFTSHIFT;
+                                break;
+                        case ASUSDEC_KEYPAD_RIGHTCTRL:
+                                ec_chip->keypad_data.input_keycode = KEY_RIGHTCTRL;
+                                break;
+                        case ASUSDEC_KEYPAD_KEY_RIGHTSHIFT:
+                                ec_chip->keypad_data.input_keycode = KEY_RIGHTSHIFT;
+                                break;
+                        case ASUSDEC_KEYPAD_RIGHTALT:
+                                ec_chip->keypad_data.input_keycode = KEY_RIGHTALT;
+                                break;
+			/*Chris mark start
+                        case ASUSDEC_KEYPAD_LEFTWIN:
+                                ec_chip->keypad_data.input_keycode = KEY_HOMEPAGE;
+                                break;
+			case ASUSDEC_KEYPAD_RIGHTWIN:
+                                ec_chip->keypad_data.input_keycode = KEY_SEARCH;
+                                break;
+			  Chris mark end*/
+                        default:
+                                break;
+                        }
+                        ASUSDEC_NOTICE("1 input_keycode = 0x%x, input_value = %d\n",
+                                ec_chip->keypad_data.input_keycode, ec_chip->keypad_data.value);
+                        input_report_key(ec_chip->indev,
+                                ec_chip->keypad_data.input_keycode, ec_chip->keypad_data.value);
+                        input_sync(ec_chip->indev);
+                }
+        }else if(ec_chip->i2c_kb_data[5] > 0){//press key
+                printk("scancode = %d\n",scancode);
+                ec_chip->keypad_data.input_keycode = asusdec_kp_key_mapping(scancode);
+                ec_chip->keypad_data.value = 1;
+                ASUSDEC_NOTICE("2 input_keycode = 0x%x, input_value = %d\n",
+                        ec_chip->keypad_data.input_keycode, ec_chip->keypad_data.value);
+                printk("input_report_key+\n");
+		input_report_key(ec_chip->indev, ec_chip->keypad_data.input_keycode, ec_chip->keypad_data.value);
+                printk("input_report_key-\n");
+                input_sync(ec_chip->indev);
+ 
+       }else{
+                ASUSDEC_INFO("Unknown scancode = 0x%x\n", scancode);
+        }
+
+}
+/*Chris end*/
 static int asusdec_kp_key_mapping(int x)
 {
 	switch (x){
@@ -1058,8 +1235,10 @@ static int asusdec_kp_key_mapping(int x)
 		case ASUSDEC_KEYPAD_KEY_SLASH:
 			return KEY_SLASH;
 
+		/*Chris mark start
 		case ASUSDEC_KEYPAD_KEY_RIGHTSHIFT:
 			return KEY_RIGHTSHIFT;
+		  Chris mark end*/
 
 		case ASUSDEC_KEYPAD_KEY_LEFT:
 			return KEY_LEFT;
@@ -1072,15 +1251,19 @@ static int asusdec_kp_key_mapping(int x)
 
 		case ASUSDEC_KEYPAD_KEY_DOWN:
 			return KEY_DOWN;
-
+		
+		/*Chris mark start
 		case ASUSDEC_KEYPAD_RIGHTWIN:
 			return KEY_SEARCH;
+		  Chris mark end*/
 
 		case ASUSDEC_KEYPAD_LEFTCTRL:
 			return KEY_LEFTCTRL;
 
+		/*Chris mark start
 		case ASUSDEC_KEYPAD_LEFTWIN:
 			return KEY_HOMEPAGE;
+		  Chris mark end*/
 
 		case ASUSDEC_KEYPAD_LEFTALT:
 			return KEY_LEFTALT;
@@ -1109,6 +1292,7 @@ static int asusdec_kp_key_mapping(int x)
 		case ASUSDEC_KEYPAD_END:
 			return KEY_END;
 
+		/*Chris mark start
 		//--- JP keys
 		case ASUSDEC_YEN:
 			return KEY_YEN;
@@ -1128,8 +1312,9 @@ static int asusdec_kp_key_mapping(int x)
 		//--- UK keys
 		case ASUSDEC_EUROPE_2:
 			return KEY_102ND;
-
+		Chris mark end*/
 		default:
+			printk("No mapping string\n");
 			return -1;
 	}
 }
@@ -1546,6 +1731,7 @@ static void asusdec_dock_init_work_function(struct work_struct *dat)
 		ASUSDEC_NOTICE("TF201 dock-init\n");
 		if (ec_chip->dock_det){
 			gpio_state = gpio_get_value(gpio);
+			/*To ensure detect dock or not*/
 			for(i = 0; i < 40; i++){
 				msleep(50);
 				if (gpio_state == gpio_get_value(gpio)){
@@ -1558,6 +1744,7 @@ static void asusdec_dock_init_work_function(struct work_struct *dat)
 					break;
 				}
 			}
+			/*To ensure detect dock or not*/
 			ec_chip->dock_det--;
 			ec_chip->re_init = 0;
 		}
@@ -1577,6 +1764,12 @@ static void asusdec_dock_init_work_function(struct work_struct *dat)
 			}
 			ec_chip->dock_type = DOCK_UNKNOWN;
 
+			/*Chris start*/
+			if (ec_chip->indev){
+			input_unregister_device(ec_chip->indev);
+			ec_chip->indev = NULL;
+			}
+			/*Chris end*/
 			memset(ec_chip->ec_model_name, 0, 32);
 			memset(ec_chip->ec_version, 0, 32);
 			ec_chip->touchpad_member = -1;
@@ -1591,6 +1784,20 @@ static void asusdec_dock_init_work_function(struct work_struct *dat)
 			asusdec_dock_status_report();
 		} else {
 			ASUSDEC_NOTICE("Dock-in detected\n");
+			/*Chris start*/
+			if (&kb_client != NULL){
+			asusdec_input_device_create(&kb_client);
+			printk("asusdec_input_device_create in\n");
+			}
+			printk("asusdec_input_device_create out\n");
+			memset(&ec_chip->i2c_kb_data, 0, 32);
+			ec_chip->i2c_kb_data[0] = 0x00;
+			ec_chip->i2c_kb_data[1] = 0x00;
+			ec_chip->i2c_kb_data[2] = 0x08;
+			i2c_smbus_write_i2c_block_data(&kb_client, 0x75, 3, ec_chip->i2c_kb_data);
+			msleep(50);//FIXME:will use retry
+			i2c_smbus_read_i2c_block_data(&kb_client, 0x73, 11, ec_chip->i2c_kb_data);
+			/*Chris end*/
 			if (gpio_get_value(asusdec_hall_sensor_gpio) || (!ec_chip->status)){
 				if (ec_chip->init_success == 0){
 					if ((!ec_chip->tf_dock) || (!ec_chip->dock_behavior)){
@@ -1855,6 +2062,9 @@ static int __devinit asusdec_probe(struct i2c_client *client,
 	mutex_init(&ec_chip->dock_init_lock);
 
 	init_timer(&ec_chip->asusdec_timer);
+	/*Chris start*/
+	asuspec_kb_init(client);
+	/*Chris end*/
 	ec_chip->asusdec_timer.function = asusdec_reset_counter;
 
 	wake_lock_init(&ec_chip->wake_lock, WAKE_LOCK_SUSPEND, "asusdec_wake");
@@ -1917,10 +2127,16 @@ static int __devinit asusdec_probe(struct i2c_client *client,
 #if AUDIO_DOCK_STAND
 	INIT_DELAYED_WORK_DEFERRABLE(&ec_chip->audio_in_out_work, asusAudiodec_in_out_work_function);
 #endif
+	/*Chris start*/
+	INIT_DELAYED_WORK_DEFERRABLE(&ec_chip->asusdec_kb_report_work, asusdec_kb_report_work_function);
+	/*Chris end*/
 	asusdec_irq_dock_in(client);
 	asusdec_irq_ec_request(client);
 	asusdec_irq_hall_sensor(client);
 	asusdec_irq(client);
+	/*Chris start*/
+	asuspec_irq_kb_int(client);
+	/*Chris end*/
 
 	queue_delayed_work(asusdec_wq, &ec_chip->asusdec_dock_init_work, 0);
 	queue_delayed_work(asusdec_wq, &ec_chip->asusdec_hall_sensor_work, 0);
@@ -2380,6 +2596,18 @@ static long asusdec_ioctl(struct file *flip,
             return -ENOTTY;
 	}
     return 0;
+}
+
+static void asusdec_enter_factory_mode(void){
+
+	ASUSDEC_NOTICE("Entering factory mode\n");
+	asusdec_dockram_read_data(0x0A);
+	ec_chip->i2c_dm_data[0] = 8;
+	ec_chip->i2c_dm_data[5] = ec_chip->i2c_dm_data[5] | 0x40;
+#if CSC_IMAGE
+        ec_chip->i2c_dm_data[5] = ec_chip->i2c_dm_data[5] & 0xBF;
+#endif
+	asusdec_dockram_write_data(0x0A,9);
 }
 
 static int BuffDataSize(void)

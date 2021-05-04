@@ -78,9 +78,9 @@ static void last_kmsg_work_function(struct work_struct *dat)
 	mm_segment_t old_fs;
 	ssize_t result;
 	//**************************************
-	//mmcblk0p8 just for t30 branch
+	//mmcblk0p9 just for t30 branch
 	//**************************************
-	char mount_point[32] = "mmcblk0p8";
+	char mount_point[32] = "mmcblk0p9";
 	#define PMC_RST_STATUS_WDT (1)
 	#define PMC_RST_STATUS_SW   (3)
 
@@ -117,7 +117,7 @@ static void last_kmsg_work_function(struct work_struct *dat)
 
 			if(!strstr(buffer, mount_point))
 			{
-				printk(KERN_INFO "last_kmsg_work_function:mmcblk0p8 was not mounted yet!\n");
+				printk(KERN_INFO "last_kmsg_work_function:mmcblk0p9 was not mounted yet!\n");
 				filp_close(fp_mounts,NULL);
 				msleep(1000);
 			}

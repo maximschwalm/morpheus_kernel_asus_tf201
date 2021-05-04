@@ -12,7 +12,7 @@
 #define TOUCHPAD_MODE			1	// 0: relative mode, 1: absolute mode
 #define TOUCHPAD_ELAN			1	// 0: not elan, 1:elantech
 #define DOCK_SPEAKER			0	// 0: not ready, 1: ready
-#define DOCK_USB				1	// 0: not ready, 1: ready
+#define DOCK_USB				0	// 0: not ready, 1: ready
 #define BATTERY_DRIVER			1	// 0: not ready, 1: ready
 #define AUDIO_DOCK_STAND		1	// 0: not ready, 1: ready
 /*
@@ -88,78 +88,79 @@
 #define ASUSDEC_KEY_SETTING		KEY_F4
 
 /*************scan 2 make mapping***************/
-#define ASUSDEC_KEYPAD_ESC		0x76
-#define ASUSDEC_KEYPAD_KEY_WAVE		0x0E
-#define ASUSDEC_KEYPAD_KEY_1		0x16
-#define ASUSDEC_KEYPAD_KEY_2		0X1E
-#define ASUSDEC_KEYPAD_KEY_3		0x26
-#define ASUSDEC_KEYPAD_KEY_4		0x25
-#define ASUSDEC_KEYPAD_KEY_5		0x2E
-#define ASUSDEC_KEYPAD_KEY_6        	0x36
-#define ASUSDEC_KEYPAD_KEY_7        	0x3D
-#define ASUSDEC_KEYPAD_KEY_8        	0x3E
-#define ASUSDEC_KEYPAD_KEY_9        	0x46
-#define ASUSDEC_KEYPAD_KEY_0        	0x45
-#define ASUSDEC_KEYPAD_KEY_MINUS    	0x4E
-#define ASUSDEC_KEYPAD_KEY_EQUAL		0x55
-#define ASUSDEC_KEYPAD_KEY_BACKSPACE	0x66
-#define ASUSDEC_KEYPAD_KEY_TAB      	0x0D
-#define ASUSDEC_KEYPAD_KEY_Q        	0x15
-#define ASUSDEC_KEYPAD_KEY_W        	0x1D
-#define ASUSDEC_KEYPAD_KEY_E        	0x24
-#define ASUSDEC_KEYPAD_KEY_R        	0x2D
-#define ASUSDEC_KEYPAD_KEY_T        	0x2C
-#define ASUSDEC_KEYPAD_KEY_Y        	0x35
-#define ASUSDEC_KEYPAD_KEY_U        	0x3C
-#define ASUSDEC_KEYPAD_KEY_I        	0x43
-#define ASUSDEC_KEYPAD_KEY_O        	0x44
-#define ASUSDEC_KEYPAD_KEY_P        	0x4D
-#define ASUSDEC_KEYPAD_KEY_LEFTBRACE	0x54
-#define ASUSDEC_KEYPAD_KEY_RIGHTBRACE 	0x5B
-#define ASUSDEC_KEYPAD_KEY_BACKSLASH	0x5D
-#define ASUSDEC_KEYPAD_KEY_CAPSLOCK 	0x58
-#define ASUSDEC_KEYPAD_KEY_A        	0x1C
-#define ASUSDEC_KEYPAD_KEY_S        	0x1B
-#define ASUSDEC_KEYPAD_KEY_D        	0x23
-#define ASUSDEC_KEYPAD_KEY_F        	0x2B
-#define ASUSDEC_KEYPAD_KEY_G        	0x34
-#define ASUSDEC_KEYPAD_KEY_H        	0x33
-#define ASUSDEC_KEYPAD_KEY_J        	0x3B
-#define ASUSDEC_KEYPAD_KEY_K        	0x42
-#define ASUSDEC_KEYPAD_KEY_L        	0x4B
-#define ASUSDEC_KEYPAD_KEY_SEMICOLON	0x4C
-#define ASUSDEC_KEYPAD_KEY_APOSTROPHE	0x52
-#define ASUSDEC_KEYPAD_KEY_ENTER    	0x5A
-#define ASUSDEC_KEYPAD_KEY_LEFTSHIFT 	0x12
-#define ASUSDEC_KEYPAD_KEY_Z        	0x1A
-#define ASUSDEC_KEYPAD_KEY_X        	0x22
-#define ASUSDEC_KEYPAD_KEY_C        	0x21
-#define ASUSDEC_KEYPAD_KEY_V        	0x2A
-#define ASUSDEC_KEYPAD_KEY_B        	0x32
-#define ASUSDEC_KEYPAD_KEY_N        	0x31
-#define ASUSDEC_KEYPAD_KEY_M        	0x3A
-#define ASUSDEC_KEYPAD_KEY_COMMA    	0x41
-#define ASUSDEC_KEYPAD_KEY_DOT   	0x49
-#define ASUSDEC_KEYPAD_KEY_SLASH    	0x4A
-#define ASUSDEC_KEYPAD_KEY_RIGHTSHIFT   	0x59
+/*Chris modify key mapping start*/
+#define ASUSDEC_KEYPAD_ESC		0x29	//0x76
+#define ASUSDEC_KEYPAD_KEY_WAVE		0x35	//0x0E
+#define ASUSDEC_KEYPAD_KEY_1		0x1e	//0x16
+#define ASUSDEC_KEYPAD_KEY_2		0X1f	//0X1E
+#define ASUSDEC_KEYPAD_KEY_3		0x20	//0x26
+#define ASUSDEC_KEYPAD_KEY_4		0x21	//0x25
+#define ASUSDEC_KEYPAD_KEY_5		0x22	//0x2E
+#define ASUSDEC_KEYPAD_KEY_6        	0x23	//0x36
+#define ASUSDEC_KEYPAD_KEY_7        	0x24	//0x3D
+#define ASUSDEC_KEYPAD_KEY_8        	0x25	//0x3E
+#define ASUSDEC_KEYPAD_KEY_9        	0x26	//0x46
+#define ASUSDEC_KEYPAD_KEY_0        	0x27	//0x45
+#define ASUSDEC_KEYPAD_KEY_MINUS    	0x2d	//0x4E
+#define ASUSDEC_KEYPAD_KEY_EQUAL	0x2e	//0x55
+#define ASUSDEC_KEYPAD_KEY_BACKSPACE	0x2a	//0x66
+#define ASUSDEC_KEYPAD_KEY_TAB      	0x2b	//0x0D
+#define ASUSDEC_KEYPAD_KEY_Q        	0x14	//0x15
+#define ASUSDEC_KEYPAD_KEY_W        	0x1a	//0x1D
+#define ASUSDEC_KEYPAD_KEY_E        	0x08	//0x24
+#define ASUSDEC_KEYPAD_KEY_R        	0x15	//0x2D
+#define ASUSDEC_KEYPAD_KEY_T        	0x17	//0x2C
+#define ASUSDEC_KEYPAD_KEY_Y        	0x1c	//0x35
+#define ASUSDEC_KEYPAD_KEY_U        	0x18	//0x3C
+#define ASUSDEC_KEYPAD_KEY_I        	0x0c	//0x43
+#define ASUSDEC_KEYPAD_KEY_O        	0x12	//0x44
+#define ASUSDEC_KEYPAD_KEY_P        	0x13	//0x4D
+#define ASUSDEC_KEYPAD_KEY_LEFTBRACE	0x2f	//0x54
+#define ASUSDEC_KEYPAD_KEY_RIGHTBRACE 	0x30	//0x5B
+#define ASUSDEC_KEYPAD_KEY_BACKSLASH	0x31	//0x5D
+#define ASUSDEC_KEYPAD_KEY_CAPSLOCK 	0x39	//0x58
+#define ASUSDEC_KEYPAD_KEY_A        	0x04	//0x1C
+#define ASUSDEC_KEYPAD_KEY_S        	0x16	//0x1B
+#define ASUSDEC_KEYPAD_KEY_D        	0x07	//0x23
+#define ASUSDEC_KEYPAD_KEY_F        	0x09	//0x2B
+#define ASUSDEC_KEYPAD_KEY_G        	0x0a	//0x34
+#define ASUSDEC_KEYPAD_KEY_H        	0x0b	//0x33
+#define ASUSDEC_KEYPAD_KEY_J        	0x0d	//0x3B
+#define ASUSDEC_KEYPAD_KEY_K        	0x0e	//0x42
+#define ASUSDEC_KEYPAD_KEY_L        	0x0f	//0x4B
+#define ASUSDEC_KEYPAD_KEY_SEMICOLON	0x33	//0x4C
+#define ASUSDEC_KEYPAD_KEY_APOSTROPHE	0x34	//0x52
+#define ASUSDEC_KEYPAD_KEY_ENTER    	0x28	//0x5A
+#define ASUSDEC_KEYPAD_KEY_LEFTSHIFT 	0x02	//0x12
+#define ASUSDEC_KEYPAD_KEY_Z        	0x1d	//0x1A
+#define ASUSDEC_KEYPAD_KEY_X        	0x1b	//0x22
+#define ASUSDEC_KEYPAD_KEY_C        	0x06	//0x21
+#define ASUSDEC_KEYPAD_KEY_V        	0x19	//0x2A
+#define ASUSDEC_KEYPAD_KEY_B        	0x05	//0x32
+#define ASUSDEC_KEYPAD_KEY_N        	0x11	//0x31
+#define ASUSDEC_KEYPAD_KEY_M        	0x10	//0x3A
+#define ASUSDEC_KEYPAD_KEY_COMMA    	0x36	//0x41
+#define ASUSDEC_KEYPAD_KEY_DOT   	0x37	//0x49
+#define ASUSDEC_KEYPAD_KEY_SLASH    	0x38	//0x4A
+#define ASUSDEC_KEYPAD_KEY_RIGHTSHIFT   0x20//0xe5	//0x59
 
-#define ASUSDEC_KEYPAD_KEY_LEFT   	0xE06B
-#define ASUSDEC_KEYPAD_KEY_RIGHT   	0xE074
-#define ASUSDEC_KEYPAD_KEY_UP		0xE075
-#define ASUSDEC_KEYPAD_KEY_DOWN		0xE072
+#define ASUSDEC_KEYPAD_KEY_LEFT   	0x50	//0xE06B
+#define ASUSDEC_KEYPAD_KEY_RIGHT   	0x4f	//0xE074
+#define ASUSDEC_KEYPAD_KEY_UP		0x52	//0xE075
+#define ASUSDEC_KEYPAD_KEY_DOWN		0x51	//0xE072
 
-#define ASUSDEC_KEYPAD_RIGHTWIN		0xE027
-#define ASUSDEC_KEYPAD_LEFTCTRL		0x14
-#define ASUSDEC_KEYPAD_LEFTWIN		0xE01F
-#define ASUSDEC_KEYPAD_LEFTALT		0x11
-#define ASUSDEC_KEYPAD_KEY_SPACE		0x29
-#define ASUSDEC_KEYPAD_RIGHTALT		0xE011
-#define ASUSDEC_KEYPAD_WINAPP		0xE02F
-#define ASUSDEC_KEYPAD_RIGHTCTRL		0xE014
-#define ASUSDEC_KEYPAD_HOME			0xE06C
-#define ASUSDEC_KEYPAD_PAGEUP		0xE07D
-#define ASUSDEC_KEYPAD_PAGEDOWN		0xE07A
-#define ASUSDEC_KEYPAD_END			0xE069
+//#define ASUSDEC_KEYPAD_RIGHTWIN		0x04	//0xE027
+#define ASUSDEC_KEYPAD_LEFTCTRL		0xe0	//0x14
+//#define ASUSDEC_KEYPAD_LEFTWIN		0x08	//0xE01F
+#define ASUSDEC_KEYPAD_LEFTALT		0xe2	//0x11
+#define ASUSDEC_KEYPAD_KEY_SPACE	0x2c	//0x29
+#define ASUSDEC_KEYPAD_RIGHTALT		0xe6	//0xE011
+#define ASUSDEC_KEYPAD_WINAPP		0x65	//0xE02F
+#define ASUSDEC_KEYPAD_RIGHTCTRL	0xe4	//0xE014
+#define ASUSDEC_KEYPAD_HOME		0x4a	//0xE06C
+#define ASUSDEC_KEYPAD_PAGEUP		0x4b	//0xE07D
+#define ASUSDEC_KEYPAD_PAGEDOWN		0x4e	//0xE07A
+#define ASUSDEC_KEYPAD_END		0x4d	//0xE069
 /************  JP keys *************/
 #define ASUSDEC_HANKAKU_ZENKAKU		0x5F
 #define ASUSDEC_YEN					0x6A
@@ -173,12 +174,23 @@
 /********************************/
 
 
-#define ASUSDEC_KEYPAD_LOCK			0xE071
+#define ASUSDEC_KEYPAD_LOCK		0x4c	//0xE071
 
+/*Chris unused key start*/
 #define ASUSDEC_KEYPAD_KEY_BREAK   	0xF0
-#define ASUSDEC_KEYPAD_KEY_EXTEND   	0xE0
+#define ASUSDEC_KEYPAD_KEY_EXTEND   	0xF0
+/*Chris unused key end*/
 
 /*************scan 2 make code mapping***************/
+#define ASUSPEC_OBF_MASK			0x1
+#define ASUSDEC_OBF_MASK			0x1
+#define ASUSPEC_KEY_MASK			0x4
+#define ASUSPEC_KBC_MASK			0x8
+#define ASUSPEC_AUX_MASK			0x20
+#define ASUSDEC_AUX_MASK			0x20
+#define ASUSPEC_SCI_MASK			0x40
+#define ASUSPEC_SMI_MASK			0x80
+/*Chris modify key mapping end*/
 
 /************* SMI event ********************/
 #define ASUSDEC_SMI_HANDSHAKING		0x50
@@ -242,6 +254,7 @@
 #define YMIN_NOMINAL 0
 #define YMAX_NOMINAL 799
 
+
 /*
  * data struct
  */
@@ -297,6 +310,9 @@ struct asusdec_chip {
 	struct delayed_work asusdec_hall_sensor_work;
 	struct delayed_work asusdec_audio_work;
 	struct delayed_work audio_in_out_work;
+	/*Chris start*/
+	struct delayed_work asusdec_kb_report_work;
+	/*Chris end*/
 #if DOCK_SPEAKER
 	struct delayed_work asusdec_audio_report_work;
 #endif
@@ -312,6 +328,9 @@ struct asusdec_chip {
 	int ret_val;
 	u8 ec_data[32];
 	u8 i2c_data[32];
+	/*Chris start*/
+	u8 i2c_kb_data[38];
+	/*Chris end*/
 	u8 i2c_dm_data[32];
 	u8 mcu_fw_version[5];
 	u8 mcu_type;

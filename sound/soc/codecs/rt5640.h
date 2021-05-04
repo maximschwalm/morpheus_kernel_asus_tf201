@@ -2117,6 +2117,7 @@ struct rt5640_priv {
 
 	int dmic_en;
 	int dsp_sw; /* expected parameter setting */
+	int dsp_version;
 	bool dsp_play_pass;
 	bool dsp_rec_pass;
 };

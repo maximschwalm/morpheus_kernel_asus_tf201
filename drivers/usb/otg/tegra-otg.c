@@ -30,9 +30,9 @@
 #include <linux/io.h>
 #include <linux/delay.h>
 #include <linux/err.h>
-#include <mach/board-cardhu-misc.h>
+#include <../gpio-names.h>
+#include <linux/gpio.h>
 
-#define BATTERY_CALLBACK_ENABLED 1
 #define USB_PHY_WAKEUP		0x408
 #define  USB_ID_INT_EN		(1 << 0)
 #define  USB_ID_INT_STATUS	(1 << 1)
@@ -51,15 +51,7 @@
 #define DBG(stuff...)	do {} while (0)
 #endif
 
-#if BATTERY_CALLBACK_ENABLED
-extern void battery_callback(unsigned cable_status);
-#endif
-
 typedef void (*callback_t)(enum usb_otg_state to, enum usb_otg_state from, void *args);
-static unsigned int project_id;
-int usb_suspend_tag;
-unsigned int previous_cable_status;
-unsigned int usb_vbus_val = 0x0;
 
 struct tegra_otg_data {
 	struct otg_transceiver otg;
@@ -217,12 +209,6 @@ static void tegra_change_otg_state(struct tegra_otg_data *tegra,
 	DBG("%s(%d) requested otg state %s-->%s\n", __func__,
 		__LINE__, tegra_state_name(from), tegra_state_name(to));
 
-	if(project_id == TEGRA3_PROJECT_ME301T) {
-		if (tegra->charger_cb) {
-			tegra->charger_cb(to, from, tegra->charger_cb_data);
-		}
-	}
-
 	if (to != OTG_STATE_UNDEFINED && from != to) {
 		otg->state = to;
 		dev_info(tegra->otg.dev, "%s --> %s\n", tegra_state_name(from),
@@ -248,17 +234,6 @@ static void tegra_change_otg_state(struct tegra_otg_data *tegra,
 				tegra_otg_notify_event(otg, USB_EVENT_NONE);
 			}
 		}
-		/*
-		    USB_VBUS_STATUS	(1 << 10)
-		    usb_vbus_val = 0, VBUS disable.
-		    usb_vbus_val = 1024, VBUS enable.
-		*/
-	} else if ((from == OTG_STATE_A_SUSPEND) && (to == OTG_STATE_A_SUSPEND) && (usb_vbus_val == 1024)) {
-		usb_vbus_val = otg_readl(tegra, USB_PHY_WAKEUP) & USB_VBUS_STATUS;
-#if BATTERY_CALLBACK_ENABLED
-		battery_callback(0x0);
-		previous_cable_status = 0;
-#endif
 	}
 }
 
@@ -280,6 +255,10 @@ static void irq_work(struct work_struct *work)
 	enum usb_otg_state to = OTG_STATE_UNDEFINED;
 	unsigned long flags;
 	unsigned long status;
+	int dock_in = 0;
+
+	dock_in = !(gpio_get_value(TEGRA_GPIO_PU4));
+	if(dock_in == 1) return;
 
 	mutex_lock(&tegra->irq_work_mutex);
 
@@ -412,6 +391,18 @@ static ssize_t show_host_en(struct device *dev, struct device_attribute *attr,
 	return strlen(buf);
 }
 
+int gpio_dock_in_init(void)
+{
+	int ret = 0;
+	ret = gpio_request(TEGRA_GPIO_PU4, "DOCK_IN");
+	if (ret < 0)
+		printk(KERN_ERR "DOCK_IN GPIO%d request fault!%d\n", TEGRA_GPIO_PU4, ret);
+	ret = gpio_direction_input(TEGRA_GPIO_PU4);
+	if (ret)
+		printk(KERN_ERR "gpio_direction_input failed for input TEGRA_GPIO_PU4=%d\n", TEGRA_GPIO_PU4);
+	return 0;
+}
+
 static ssize_t store_host_en(struct device *dev, struct device_attribute *attr,
 				const char *buf, size_t count)
 {
@@ -523,6 +514,7 @@ static int tegra_otg_probe(struct platform_device *pdev)
 		err = 0;
 	}
 
+	gpio_dock_in_init();
 	INIT_WORK(&tegra->work, irq_work);
 
 	dev_info(&pdev->dev, "otg transceiver registered\n");
@@ -585,14 +577,11 @@ static int tegra_otg_suspend(struct device *dev)
 	otg_writel(tegra, val, USB_PHY_WAKEUP);
 	clk_disable(tegra->clk);
 
-	usb_suspend_tag = true;
-
 	/* Suspend peripheral mode, host mode is taken care by host driver */
 	if (otg->state == OTG_STATE_B_PERIPHERAL)
 		tegra_change_otg_state(tegra, OTG_STATE_A_SUSPEND);
 
 	tegra->suspended = true;
-	usb_vbus_val = otg_readl(tegra, USB_PHY_WAKEUP) & USB_VBUS_STATUS;
 
 	DBG("%s(%d) END\n", __func__, __LINE__);
 	mutex_unlock(&tegra->irq_work_mutex);
@@ -631,8 +620,6 @@ static void tegra_otg_resume(struct device *dev)
 	if (!(tegra->int_status & USB_ID_STATUS))
 		tegra->int_status = (tegra->int_status | USB_ID_INT_STATUS);
 
-	usb_suspend_tag = false;
-
 	spin_unlock_irqrestore(&tegra->lock, flags);
 	schedule_work(&tegra->work);
 	enable_interrupt(tegra, true);
@@ -662,7 +649,6 @@ static struct platform_driver tegra_otg_driver = {
 
 static int __init tegra_otg_init(void)
 {
-	project_id = tegra3_get_project_id();
 	return platform_driver_register(&tegra_otg_driver);
 }
 subsys_initcall(tegra_otg_init);

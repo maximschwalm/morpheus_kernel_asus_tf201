@@ -827,7 +827,7 @@ static int tps61050_open(struct inode *inode, struct file *file)
 	struct tps61050_info *info = NULL;
 	struct tps61050_info *pos = NULL;
 	int err;
-
+	printk("%s ++\n", __func__);
 	rcu_read_lock();
 	list_for_each_entry_rcu(pos, &tps61050_info_list, list) {
 		if (pos->miscdev.minor == iminor(inode)) {
@@ -844,16 +844,20 @@ static int tps61050_open(struct inode *inode, struct file *file)
 		dev_err(&info->i2c_client->dev,
 			 "%s err: invalid num (%u) and sync (%u) instance\n",
 			 __func__, info->pdata->num, info->pdata->sync);
-	if (atomic_xchg(&info->in_use, 1))
+	if (atomic_xchg(&info->in_use, 1)) {
+		printk("atomic_xchg Busy (%d)\n", __LINE__);
 		return -EBUSY;
-
+	}
 	if (info->s_info != NULL) {
-		if (atomic_xchg(&info->s_info->in_use, 1))
+		if (atomic_xchg(&info->s_info->in_use, 1)) {
+			printk("atomic_xchg Busy (%d)\n", __LINE__);
 			return -EBUSY;
+		}
 	}
 
 	file->private_data = info;
 	dev_dbg(&info->i2c_client->dev, "%s\n", __func__);
+	printk("%s --\n", __func__);
 	return 0;
 }
 
@@ -905,7 +909,7 @@ static int tps61050_probe(
 	struct tps61050_info *info;
 	char dname[16];
 	int err;
-
+	printk("%s ++\n", __func__);
 	dev_dbg(&client->dev, "%s\n", __func__);
 	info = devm_kzalloc(&client->dev, sizeof(*info), GFP_KERNEL);
 	if (info == NULL) {
@@ -915,6 +919,7 @@ static int tps61050_probe(
 
 	info->i2c_client = client;
 	if (client->dev.platform_data) {
+		printk("get platform_data (%d) \n", __LINE__);
 		info->pdata = client->dev.platform_data;
 	} else {
 		info->pdata = &tps61050_default_pdata;
@@ -936,17 +941,20 @@ static int tps61050_probe(
 			return -ENODEV;
 		}
 	} else {
-		dev_dbg(&client->dev, "%s device found\n", __func__);
+		dev_err(&client->dev, "%s device found\n", __func__);
 	}
 
-	if (info->pdata->dev_name != 0)
+	if (info->pdata->dev_name != 0) {
 		strcpy(dname, info->pdata->dev_name);
-	else
+	}
+	else {
 		strcpy(dname, "tps61050");
-	if (info->pdata->num)
+	}
+	if (info->pdata->num) {
 		snprintf(dname, sizeof(dname), "%s.%u",
 			 dname, info->pdata->num);
-	info->miscdev.name = dname;
+	}
+	info->miscdev.name = "torch";
 	info->miscdev.fops = &tps61050_fileops;
 	info->miscdev.minor = MISC_DYNAMIC_MINOR;
 	if (misc_register(&info->miscdev)) {
@@ -955,7 +963,8 @@ static int tps61050_probe(
 		tps61050_del(info);
 		return -ENODEV;
 	}
-
+	else printk("In %s misc register successful\n", __func__);
+	printk("%s --\n", __func__);
 	return 0;
 }
 

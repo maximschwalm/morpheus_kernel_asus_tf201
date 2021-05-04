@@ -44,9 +44,9 @@
 #include "gpio-names.h"
 #include "tegra3_host1x_devices.h"
 
-#define DC_CTRL_MODE	(TEGRA_DC_OUT_ONE_SHOT_MODE | \
+//#define DC_CTRL_MODE	(TEGRA_DC_OUT_ONE_SHOT_MODE | \
 			 TEGRA_DC_OUT_ONE_SHOT_LP_MODE)
-
+#define DC_CTRL_MODE    TEGRA_DC_OUT_CONTINUOUS_MODE //liwei
 #define AVDD_LCD PMU_TCA6416_GPIO_PORT17
 #define DSI_PANEL_RESET 1
 
@@ -88,6 +88,9 @@
 #define cardhu_dsi_pnl_reset		TEGRA_GPIO_PD2
 #define cardhu_dsi_219_pnl_reset	TEGRA_GPIO_PW0
 
+/*TF600T dsi panel pins */
+#define en_vdd_pnl			TEGRA_GPIO_PL4
+
 #define ME301T_panel_type_ID1 TEGRA_GPIO_PH7 //GMI_AD15
 #define ME301T_panel_type_ID2 TEGRA_GPIO_PK7 //GMI_A19
 
@@ -105,6 +108,7 @@ static struct regulator *cardhu_dsi_reg = NULL;
 static struct regulator *cardhu_lvds_reg = NULL;
 static struct regulator *cardhu_lvds_vdd_bl = NULL;
 static struct regulator *cardhu_lvds_vdd_panel = NULL;
+static struct regulator *TF600T_panel_1v2 = NULL; //liwei For TF600 panel
 
 static struct board_info board_info;
 static struct board_info display_board_info;
@@ -157,15 +161,17 @@ static p_tegra_dc_bl_output bl_output = cardhu_bl_output_measured;
 static bool is_panel_218;
 static bool is_panel_219;
 static bool is_panel_1506;
+static bool is_panel_TF600;
 extern int cn_vf_sku;
 
 static bool is_dsi_panel(void)
 {
-	return is_panel_218 || is_panel_219 || is_panel_1506;
+	return is_panel_218 || is_panel_219 || is_panel_1506 || is_panel_TF600;
 }
 
 static int cardhu_backlight_init(struct device *dev)
 {
+	//printk("display function %s\n", __func__);
 	int ret = 0;
 
 	if (WARN_ON(ARRAY_SIZE(cardhu_bl_output_measured) != 256))
@@ -206,6 +212,15 @@ static int cardhu_backlight_init(struct device *dev)
 		ret = gpio_direction_output(cardhu_dsia_bl_enb, 1);
 		if (ret < 0)
 			gpio_free(cardhu_dsia_bl_enb);
+	} else if (is_panel_TF600) {
+		ret = gpio_request(cardhu_bl_enb, "backlight_enb");
+		if (ret < 0)
+			return ret;
+
+		ret = gpio_direction_output(cardhu_bl_enb, 1);
+		if (ret < 0)
+			gpio_free(cardhu_bl_enb);
+
 	}
 
 	return ret;
@@ -213,6 +228,7 @@ static int cardhu_backlight_init(struct device *dev)
 
 static void cardhu_backlight_exit(struct device *dev)
 {
+	//printk("display function %s\n", __func__);	
 	if (!is_dsi_panel()) {
 		/* int ret; */
 		/*ret = gpio_request(cardhu_bl_enb, "backlight_enb");*/
@@ -236,11 +252,16 @@ static void cardhu_backlight_exit(struct device *dev)
 
 		gpio_set_value(cardhu_lvds_shutdown, 1);
 		mdelay(20);
+	} else if (is_panel_TF600) {
+		gpio_set_value(cardhu_bl_enb, 0);
+		gpio_free(cardhu_bl_enb);
+		//mdelay(20);
 	}
 }
 
 static int cardhu_backlight_notify(struct device *unused, int brightness)
 {
+	//printk("display function %s\n", __func__);	
 	int cur_sd_brightness = atomic_read(&sd_brightness);
 
 	if (!is_dsi_panel()) {
@@ -258,6 +279,9 @@ static int cardhu_backlight_notify(struct device *unused, int brightness)
 	} else if (is_panel_1506) {
 		/* DSIa */
 		gpio_set_value(e1506_bl_enb, !!brightness);
+	} else if (is_panel_TF600) {
+
+		gpio_set_value(cardhu_bl_enb, !!brightness);
 	}
 
         if (tegra3_get_project_id() == TEGRA3_PROJECT_TF201
@@ -284,7 +308,7 @@ static struct platform_pwm_backlight_data cardhu_backlight_data = {
 	.pwm_id		= 0,
 	.max_brightness	= 255,
 	.dft_brightness	= 100,
-	.pwm_period_ns	= 4000000,
+	.pwm_period_ns	= 71428,//4000000,
 	.init		= cardhu_backlight_init,
 	.exit		= cardhu_backlight_exit,
 	.notify		= cardhu_backlight_notify,
@@ -303,6 +327,7 @@ static struct platform_device cardhu_backlight_device = {
 static int cardhu_panel_enable(void)
 {
 	//printk("Check cardhu_panel_enable \n");
+	//printk("display function %s\n", __func__);
 
 	if (cardhu_lvds_vdd_panel == NULL) {
 		cardhu_lvds_vdd_panel = regulator_get(NULL, "vdd_lcd_panel");
@@ -321,6 +346,7 @@ static int cardhu_panel_enable_tf700t(void)
 {
 	int ret;
 	//printk("Check cardhu_panel_enable_tf700t \n");
+	//printk("display function %s\n", __func__);
 
 	if (gpio_get_value(TEGRA_GPIO_PI6)==0){	//Panel is Panasonic
 		//printk("Check panel is panasonic \n");
@@ -425,6 +451,7 @@ static int cardhu_panel_enable_tf700t(void)
 static int cardhu_panel_disable(void)
 {
 	//printk("Check cardhu_panel_disable \n");
+	//printk("display function %s\n", __func__);
 
 	if(cardhu_lvds_reg) {
 		regulator_disable(cardhu_lvds_reg);
@@ -487,6 +514,7 @@ static int cardhu_panel_postpoweron(void)
 {
 	//tf700t not get involved
 	//printk("Check cardhu_panel_postpoweron \n");
+	//printk("display function %s\n", __func__);
 
 	if (cardhu_lvds_reg == NULL) {
 		cardhu_lvds_reg = regulator_get(NULL, "vdd_lvds");
@@ -521,6 +549,8 @@ static int cardhu_panel_prepoweroff(void)
 	// But for TF300TG/TL, EN_VDD_BL is BL_EN, need to control it
 	// EE confirms that we can control it in original timing because
 	// EN_VDD_BL/LCD_BL_PWM/LCD_BL_EN pull high/low almost the same time
+	//printk("display function %s\n", __func__);
+
 	if(cardhu_lvds_vdd_bl) {
 		regulator_disable(cardhu_lvds_vdd_bl);
 		regulator_put(cardhu_lvds_vdd_bl);
@@ -562,6 +592,7 @@ static int cardhu_hdmi_vddio_enable(void)
 
 static int cardhu_hdmi_vddio_disable(void)
 {
+	//printk("display function %s\n", __func__);	
 	if (cardhu_hdmi_vddio) {
 		regulator_disable(cardhu_hdmi_vddio);
 		regulator_put(cardhu_hdmi_vddio);
@@ -572,6 +603,7 @@ static int cardhu_hdmi_vddio_disable(void)
 
 static int cardhu_hdmi_enable(void)
 {
+	//printk("display function %s\n", __func__);	
 	int ret;
 	if (!cardhu_hdmi_reg) {
 		cardhu_hdmi_reg = regulator_get(NULL, "avdd_hdmi");
@@ -999,6 +1031,7 @@ static struct tegra_dc_platform_data cardhu_disp2_pdata = {
 
 static int cardhu_dsi_panel_enable(void)
 {
+	printk("display function %s\n", __func__);	
 	int ret;
 
 	if (cardhu_dsi_reg == NULL) {
@@ -1011,7 +1044,7 @@ static int cardhu_dsi_panel_enable(void)
 	}
 
 	regulator_enable(cardhu_dsi_reg);
-
+/* //TF600T display doesn't control it
 	if (!is_panel_1506) {
 		ret = gpio_request(AVDD_LCD, "avdd_lcd");
 		if (ret < 0)
@@ -1020,7 +1053,7 @@ static int cardhu_dsi_panel_enable(void)
 		if (ret < 0)
 			gpio_free(AVDD_LCD);
 	}
-
+*/
 	if (is_panel_219) {
 		ret = gpio_request(cardhu_bl_pwm, "bl_pwm");
 		if (ret < 0)
@@ -1080,6 +1113,25 @@ static int cardhu_dsi_panel_enable(void)
 		mdelay(10);
 		gpio_set_value(e1506_bl_enb, 1);
 		mdelay(15);
+	} else if (is_panel_TF600) {
+	//do something
+	if (TF600T_panel_1v2 == NULL) {
+                TF600T_panel_1v2 = regulator_get(NULL, "TF600T_panel_1v2");//en_vddio_ddr_1v2" to open ldo
+                if (WARN_ON(IS_ERR(TF600T_panel_1v2)))
+                        pr_err("%s: couldn't get regulator TF600T_panel_1v2: %ld\n",
+                                        __func__, PTR_ERR(TF600T_panel_1v2));
+                else {
+                        regulator_enable(TF600T_panel_1v2);
+			//regulator_set_voltage(TF600T_panel_1v2,1200000,1200000);
+			printk("display regulator_enable TF600T_panel_1v2\n");
+		}
+	}
+		ret = gpio_request(en_vdd_pnl, "en_vdd_pnl");
+		if (ret < 0)
+                    printk("display fail gpio request en_vdd_pnl\n");;
+
+		ret = gpio_direction_output(en_vdd_pnl, 1);
+
 	}
 
 #if DSI_PANEL_RESET
@@ -1141,8 +1193,27 @@ static int cardhu_dsi_panel_enable(void)
 static int cardhu_dsi_panel_disable(void)
 {
 	int err;
-
 	err = 0;
+        printk("display function %s\n", __func__);
+        if (cardhu_dsi_reg) {
+                err = regulator_disable(cardhu_dsi_reg);
+                if (err < 0)
+                        printk(KERN_ERR
+                        "DSI regulator avdd_dsi_csi disable failed\n");
+                regulator_put(cardhu_dsi_reg);
+                cardhu_dsi_reg = NULL;
+        }
+
+        //for TF600 panel
+
+        if (TF600T_panel_1v2) {
+                err = regulator_disable(TF600T_panel_1v2);
+                if (err < 0)
+                        printk(KERN_ERR
+                        "panel regulator TF600T_panel_1v2 disable failed\n");
+                regulator_put(TF600T_panel_1v2);
+                TF600T_panel_1v2 = NULL;
+        }
 
 	if (is_panel_219) {
 		gpio_free(cardhu_dsi_219_pnl_reset);
@@ -1156,25 +1227,18 @@ static int cardhu_dsi_panel_disable(void)
 		gpio_free(cardhu_dsi_pnl_reset);
 		gpio_free(e1506_panel_enb);
 		gpio_free(e1506_dsi_vddio);
+	}else if (is_panel_TF600) {
+		gpio_free(en_vdd_pnl);
 	}
 	return err;
 }
 
 static int cardhu_dsi_panel_postsuspend(void)
 {
+	printk("display function %s\n", __func__);	
 	int err;
 
 	err = 0;
-	printk(KERN_INFO "DSI panel postsuspend\n");
-
-	if (cardhu_dsi_reg) {
-		err = regulator_disable(cardhu_dsi_reg);
-		if (err < 0)
-			printk(KERN_ERR
-			"DSI regulator avdd_dsi_csi disable failed\n");
-		regulator_put(cardhu_dsi_reg);
-		cardhu_dsi_reg = NULL;
-	}
 
 	if (is_panel_218)
 		gpio_free(AVDD_LCD);
@@ -1191,6 +1255,14 @@ static struct tegra_dsi_cmd dsi_init_cmd[] = {
 	DSI_CMD_SHORT(0x05, 0x29, 0x00),
 	DSI_DLY_MS(20),
 };
+
+static struct tegra_dsi_cmd dsi_init_cmd_TF600T[] = {
+        DSI_CMD_SHORT(0x05, 0x11, 0x00),
+        DSI_DLY_MS(20),
+        DSI_CMD_SHORT(0x05, 0x29, 0x00),
+        DSI_DLY_MS(20),
+};
+
 
 u8 password_array[] = {0xb9, 0xff, 0x83, 0x92};
 
@@ -1330,6 +1402,21 @@ static struct tegra_dc_mode cardhu_dsi_modes_1506[] = {
 	},
 };
 
+static struct tegra_dc_mode cardhu_dsi_modes_TF600T[] = {
+        {
+                .pclk = 72000000,
+                .h_ref_to_sync = 0,
+                .v_ref_to_sync = 1,
+                .h_sync_width = 36,
+                .v_sync_width = 7,
+                .h_back_porch = 24,
+                .v_back_porch = 4,
+                .h_active = 1366,
+                .v_active = 768,
+                .h_front_porch = 74,
+                .v_front_porch = 21,
+        },
+};
 
 static struct tegra_fb_data cardhu_dsi_fb_data = {
 	.win		= 0,
@@ -1387,6 +1474,7 @@ static struct nvhost_device cardhu_disp1_device = {
 
 static int cardhu_disp1_check_fb(struct device *dev, struct fb_info *info)
 {
+	//printk("display function %s\n", __func__);	
 	return info->device == &cardhu_disp1_device.dev;
 }
 
@@ -1506,6 +1594,7 @@ struct early_suspend cardhu_panel_early_suspender;
 
 static void cardhu_panel_early_suspend(struct early_suspend *h)
 {
+	//printk("display function %s\n", __func__);	
 	/* power down LCD, add use a black screen for HDMI */
 	if (num_registered_fb > 0)
 		fb_blank(registered_fb[0], FB_BLANK_POWERDOWN);
@@ -1520,6 +1609,7 @@ static void cardhu_panel_early_suspend(struct early_suspend *h)
 
 static void cardhu_panel_late_resume(struct early_suspend *h)
 {
+	//printk("display function %s\n", __func__);	
 	unsigned i;
 #ifdef CONFIG_TEGRA_CONVSERVATIVE_GOV_ON_EARLYSUPSEND
 	cpufreq_restore_default_gov();
@@ -1531,12 +1621,16 @@ static void cardhu_panel_late_resume(struct early_suspend *h)
 
 static void cardhu_panel_preinit(void)
 {
+	printk("display function %s\n", __func__);	
+	/*
 	if (display_board_info.board_id == BOARD_DISPLAY_E1213)
 		is_panel_218 = true;
 	else if (display_board_info.board_id == BOARD_DISPLAY_E1253)
 		is_panel_219 = true;
 	else if (display_board_info.board_id == BOARD_DISPLAY_E1506)
 		is_panel_1506 = true;
+	*/
+	is_panel_TF600 = true;
 
 	if (!is_dsi_panel()) {
 		cardhu_disp1_out.parent_clk_backup = "pll_d_out0";
@@ -1617,6 +1711,26 @@ static void cardhu_panel_preinit(void)
 			/* Set height and width in mm. */
 			cardhu_disp1_out.height = 95;
 			cardhu_disp1_out.width = 53;
+		} else if (is_panel_TF600) {
+			cardhu_dsi.n_init_cmd = ARRAY_SIZE(dsi_init_cmd_TF600T);
+			cardhu_dsi.dsi_init_cmd = dsi_init_cmd_TF600T;
+			cardhu_dsi.video_burst_mode = TEGRA_DSI_VIDEO_NONE_BURST_MODE;
+			cardhu_dsi.panel_reset_timeout_msec = 202;
+			cardhu_dsi.hs_clk_in_lp_cmd_mode_freq_khz = 20250;
+			cardhu_dsi.enable_hs_clock_on_lp_cmd_mode = false;
+			cardhu_dsi.lp_cmd_mode_freq_khz = 20000;
+			cardhu_dsi.video_data_type = TEGRA_DSI_VIDEO_TYPE_VIDEO_MODE;
+			cardhu_dsi.panel_has_frame_buffer = false;
+			cardhu_disp1_out.parent_clk = "pll_d_out0";
+			cardhu_disp1_out.depth = 24;
+			//cardhu_disp1_out.postpoweron = cardhu_panel_postpoweron;
+			cardhu_disp1_out.modes  = cardhu_dsi_modes_TF600T;
+			cardhu_disp1_out.n_modes = ARRAY_SIZE(cardhu_dsi_modes_TF600T);
+			cardhu_dsi_fb_data.xres = 1366;//864;
+			cardhu_dsi_fb_data.yres = 768;//480;
+            /* Set height and width in mm. */
+			cardhu_disp1_out.height = 220;
+			cardhu_disp1_out.width = 140;
 		}
 
 		cardhu_disp1_pdata.fb = &cardhu_dsi_fb_data;
@@ -1625,6 +1739,7 @@ static void cardhu_panel_preinit(void)
 
 int __init cardhu_panel_init(void)
 {
+	//printk("display function %s\n", __func__);
 	int err;
 	struct resource __maybe_unused *res;
 

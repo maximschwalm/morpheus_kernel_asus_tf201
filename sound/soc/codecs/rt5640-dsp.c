@@ -26,9 +26,12 @@
 #include "rt5640.h"
 #include "rt5640-dsp.h"
 
+void rt5640_dump_test (struct snd_soc_codec *codec);
+
+struct delayed_work dsp_work;
 
 static const u16 rt5640_dsp_init[][2] = {
-	{0x3fd2, 0x0038}, {0x229C, 0x0fa0}, {0x22d2, 0x8400}, {0x22ee, 0x0001},
+	{0x229C, 0x0fa0}, {0x22ee, 0x0001},
 	{0x22f2, 0x0040}, {0x22f5, 0x8000}, {0x22f6, 0x0000}, {0x22f9, 0x007f},
 	{0x2310, 0x0880},
 };
@@ -391,6 +394,7 @@ static int rt5640_dsp_put(struct snd_kcontrol *kcontrol,
 	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
 	struct rt5640_priv *rt5640 = snd_soc_codec_get_drvdata(codec);
 
+	schedule_delayed_work(&dsp_work, 10);
 	if (rt5640->dsp_sw != ucontrol->value.integer.value[0])
 		rt5640->dsp_sw = ucontrol->value.integer.value[0];
 
@@ -767,6 +771,7 @@ static void rt5640_do_dsp_patch(struct work_struct *work)
 static int rt5640_dsp_conf(struct snd_soc_codec *codec)
 {
 	struct rt5640_dsp_param param;
+	struct rt5640_priv *rt5640 = snd_soc_codec_get_drvdata(codec);
 	int ret, i;
 
 	ret = snd_soc_update_bits(codec, RT5640_DSP_CTRL3,
@@ -793,12 +798,36 @@ static int rt5640_dsp_conf(struct snd_soc_codec *codec)
 		goto conf_err;
 	}
 
+	pr_info("rt5640->dsp_version= 0x%x\n", rt5640->dsp_version);
+	
 	param.cmd_fmt = 0x00e0;
 	param.cmd = RT5640_DSP_CMD_MW;
+	if (0x501a == rt5640->dsp_version) {
+		param.addr = 0x22d2;
+		param.data = 0x8400;
+		rt5640_dsp_write(codec, &param);
+        mdelay(40);
+        printk("first: 0x%x 0x%x\n",param.addr , rt5640_dsp_read(codec, param.addr));
+        rt5640_dsp_write(codec, &param);
+        mdelay(10);    
+	} else if( 0x395c == rt5640->dsp_version) {
+		param.addr = 0x3fd2;
+		param.data = 0x0038;
+		rt5640_dsp_write(codec, &param);
+	} else {
+		pr_err("Unknown DSP version\n");
+	}
+	printk("0x%x 0x%x\n",param.addr , rt5640_dsp_read(codec, param.addr));
+	for(i = 0; i < 5; i++) {
+		rt5640_dsp_write(codec, &param);
+		if (rt5640_dsp_read(codec, param.addr) == param.data)
+			break;
+	}
 	for(i = 0; i < RT5640_DSP_INIT_NUM; i++) {
 		param.addr = rt5640_dsp_init[i][0];
 		param.data = rt5640_dsp_init[i][1];
 		ret = rt5640_dsp_write(codec, &param);
+		printk("0x%x 0x%x\n",rt5640_dsp_init[i][0] , rt5640_dsp_read(codec, rt5640_dsp_init[i][0]));
 		if (ret < 0) {
 			dev_err(codec->dev, "Fail to config Dsp: %d\n", ret);
 			goto conf_err;
@@ -973,8 +1002,8 @@ static int rt5640_dsp_event(struct snd_soc_dapm_widget *w,
 			return 0;
 		power_on--;
 		if (!power_on) {
-			snd_soc_update_bits(codec, RT5640_PWR_DIG2,
-				RT5640_PWR_I2S_DSP, 0);
+			//snd_soc_update_bits(codec, RT5640_PWR_DIG2,
+			//	RT5640_PWR_I2S_DSP, 0);
 			snd_soc_update_bits(codec, RT5640_DSP_CTRL3,
 				RT5640_DSP_PD_PIN_MASK, RT5640_DSP_PD_PIN_LO);
 		}
@@ -1092,9 +1121,62 @@ dsp_done:
 	return cnt;
 }
 static DEVICE_ATTR(dsp_reg, 0444, rt5640_dsp_show, NULL);
+struct snd_soc_codec *g_codec;
+
+
+
+static void dsp_test(struct work_struct *work __attribute__((unused)))
+{
+        struct rt5640_dsp_param param;
+        int ret;
+
+        printk("%s: dsp_work start \n", __func__);
+       
+        //rt5640_dump_test (g_codec); 
+
+        ret = snd_soc_update_bits(g_codec, RT5640_PWR_DIG2,
+                RT5640_PWR_I2S_DSP, RT5640_PWR_I2S_DSP);
+        if (ret < 0) {
+                dev_err(g_codec->dev,
+                        "Failed to power up DSP IIS interface: %d\n", ret);
+        }
+        ret = snd_soc_read(g_codec, RT5640_GLB_CLK) &
+                                RT5640_SCLK_SRC_MASK;
+        snd_soc_update_bits(g_codec, RT5640_GLB_CLK,
+                        RT5640_SCLK_SRC_MASK, RT5640_SCLK_SRC_RCCLK);
+/*
+        snd_soc_write(codec, RT5640_DSP_CTRL3, 0x0800);        //power on dsp power and reset dsp
+        mdelay(1);
+        snd_soc_update_bits(codec, RT5640_DSP_CTRL3, 0x0400, 0x0400); //set dsp to normal
+        mdelay(20);
+        snd_soc_write(codec, RT5640_DUMMY3, 0x0000);        //set dsp format to general
+        rt5640->dsp_version = rt5640_dsp_read(codec, 0x3800);
+        pr_info("DSP version code = 0x%04x\n",rt5640->dsp_version);
+        printk("%s: dsp prob 3 \n", __func__);
+*/
+        rt5640_dsp_conf(g_codec);
+        param.cmd_fmt = 0x00e0;
+        param.cmd = RT5640_DSP_CMD_MW;
+        param.addr = 0x22fb;
+        param.data = 0x0000;
+        ret = rt5640_dsp_write(g_codec, &param);
+        if (ret < 0) {
+                dev_err(g_codec->dev, "Fail to write Dsp: %d\n", ret);
+        }
+	printk("read 0x%x = 0x%x\n", 0x22fb, rt5640_dsp_read(g_codec,0x22fb ));
+	printk("read 0x%x = 0x%x\n", 0x2306, rt5640_dsp_read(g_codec,0x2306 ));
+	mdelay(20); //bard 10-8
+        //snd_soc_write(g_codec, RT5640_DSP_CTRL3, 0x0400);
+	mdelay(20); //bard 10-8
+	printk("read 0x%x = 0x%x\n", 0x2306, rt5640_dsp_read(g_codec,0x2306 ));
+        snd_soc_update_bits(g_codec, RT5640_GLB_CLK,
+                                RT5640_SCLK_SRC_MASK, ret);
+        //snd_soc_update_bits(g_codec, RT5640_PWR_DIG2,
+         //       RT5640_PWR_I2S_DSP, 0);
+}
 
 /**
- * rt5640_dsp_probe - register DSP for rt5640
+ *ert5640_dsp_probe - register DSP for rt5640
  * @codec: audio codec
  *
  * To register DSP function for rt5640.
@@ -1104,11 +1186,15 @@ static DEVICE_ATTR(dsp_reg, 0444, rt5640_dsp_show, NULL);
 int rt5640_dsp_probe(struct snd_soc_codec *codec)
 {
 	struct rt5640_priv *rt5640;
+	struct rt5640_dsp_param param;
 	int ret;
 
 	if (codec == NULL)
 		return -EINVAL;
+     
+        g_codec = codec;
 
+	rt5640 = snd_soc_codec_get_drvdata(codec);
 	snd_soc_add_controls(codec, rt5640_dsp_snd_controls,
 			ARRAY_SIZE(rt5640_dsp_snd_controls));
 	snd_soc_dapm_new_controls(&codec->dapm, rt5640_dsp_dapm_widgets,
@@ -1116,25 +1202,50 @@ int rt5640_dsp_probe(struct snd_soc_codec *codec)
 	snd_soc_dapm_add_routes(&codec->dapm, rt5640_dsp_dapm_routes,
 			ARRAY_SIZE(rt5640_dsp_dapm_routes));
 
+        printk("%s: dsp_work \n", __func__);
+        
+        INIT_DELAYED_WORK(&dsp_work, dsp_test);
+
+        schedule_delayed_work(&dsp_work, 1000);
+
 	/* Patch DSP rom code if IC version is larger than C version */
 	//if (RT5640_VER_C != snd_soc_read(codec, RT5640_VENDOR_ID)) {
+
 	ret = snd_soc_update_bits(codec, RT5640_PWR_DIG2,
 		RT5640_PWR_I2S_DSP, RT5640_PWR_I2S_DSP);
 	if (ret < 0) {
 		dev_err(codec->dev,
 			"Failed to power up DSP IIS interface: %d\n", ret);
 	}
+	ret = snd_soc_read(codec, RT5640_GLB_CLK) &
+				RT5640_SCLK_SRC_MASK;
+	snd_soc_update_bits(codec, RT5640_GLB_CLK,
+			RT5640_SCLK_SRC_MASK, RT5640_SCLK_SRC_RCCLK);
+	snd_soc_write(codec, RT5640_DSP_CTRL3, 0x0800);        //power on dsp power and reset dsp
+	mdelay(1);
+	snd_soc_update_bits(codec, RT5640_DSP_CTRL3, 0x0400, 0x0400); //set dsp to normal
+	mdelay(20);    
+	snd_soc_write(codec, RT5640_DUMMY3, 0x0000);        //set dsp format to general
+	rt5640->dsp_version = rt5640_dsp_read(codec, 0x3800);
+	pr_info("DSP version code = 0x%04x\n",rt5640->dsp_version);
+        printk("%s: dsp prob 3 \n", __func__);
+/*
 	rt5640_dsp_conf(codec);
-	ret = rt5640_dsp_read(codec, 0x3800);
-	pr_info("DSP version code = 0x%04x\n",ret);
-	if(ret != 0x501a) {
-		rt5640 = snd_soc_codec_get_drvdata(codec);
-		INIT_DELAYED_WORK(&rt5640->patch_work, rt5640_do_dsp_patch);
-		schedule_delayed_work(&rt5640->patch_work,
-				msecs_to_jiffies(100));
+	param.cmd_fmt = 0x00e0;
+	param.cmd = RT5640_DSP_CMD_MW;
+	param.addr = 0x22fb;
+	param.data = 0x0000;
+	ret = rt5640_dsp_write(codec, &param);
+	if (ret < 0) {
+		dev_err(codec->dev, "Fail to write Dsp: %d\n", ret);
 	}
-	snd_soc_update_bits(codec, RT5640_PWR_DIG2,
-		RT5640_PWR_I2S_DSP, 0);
+	snd_soc_write(codec, RT5640_DSP_CTRL3, 0x0400);
+*/
+	snd_soc_update_bits(codec, RT5640_GLB_CLK,
+				RT5640_SCLK_SRC_MASK, ret);
+	//snd_soc_update_bits(codec, RT5640_PWR_DIG2,
+	//	RT5640_PWR_I2S_DSP, 0);
+
 
 	ret = device_create_file(codec->dev, &dev_attr_dsp_reg);
 	if (ret != 0) {
@@ -1287,71 +1398,42 @@ EXPORT_SYMBOL_GPL(rt56xx_dsp_ioctl_common);
 #ifdef CONFIG_PM
 int rt5640_dsp_suspend(struct snd_soc_codec *codec, pm_message_t state)
 {
+	return 0;
+
+}
+EXPORT_SYMBOL_GPL(rt5640_dsp_suspend);
+
+int rt5640_dsp_resume(struct snd_soc_codec *codec)
+{
 	struct rt5640_dsp_param param;
 	int ret;
-
-	if (RT5640_VER_C == snd_soc_read(codec, RT5640_VENDOR_ID))
-		return 0;
 
 	ret = snd_soc_update_bits(codec, RT5640_PWR_DIG2,
 		RT5640_PWR_I2S_DSP, RT5640_PWR_I2S_DSP);
 	if (ret < 0) {
 		dev_err(codec->dev,
 			"Failed to power up DSP IIS interface: %d\n", ret);
-		goto rsm_err;
 	}
-
-	ret = snd_soc_update_bits(codec, RT5640_DSP_CTRL3,
-		RT5640_DSP_PD_PIN_MASK, RT5640_DSP_PD_PIN_HI);
-	if (ret < 0) {
-		dev_err(codec->dev, "Failed to power up DSP: %d\n", ret);
-		goto rsm_err;
-	}
-
-	ret = snd_soc_update_bits(codec, RT5640_DSP_CTRL3,
-		RT5640_DSP_RST_PIN_MASK, RT5640_DSP_RST_PIN_LO);
-	if (ret < 0) {
-		dev_err(codec->dev, "Failed to reset DSP: %d\n", ret);
-		goto rsm_err;
-	}
-
-	mdelay(10);
-
-	ret = snd_soc_update_bits(codec, RT5640_DSP_CTRL3,
-		RT5640_DSP_RST_PIN_MASK, RT5640_DSP_RST_PIN_HI);
-	if (ret < 0) {
-		dev_err(codec->dev, "Failed to recover DSP: %d\n", ret);
-		goto rsm_err;
-	}
-
+	ret = snd_soc_read(codec, RT5640_GLB_CLK) &
+				RT5640_SCLK_SRC_MASK;
+	snd_soc_update_bits(codec, RT5640_GLB_CLK,
+			RT5640_SCLK_SRC_MASK, RT5640_SCLK_SRC_RCCLK);
+        printk("%s: dsp prob 3 \n", __func__);
+	rt5640_dsp_conf(codec);
 	param.cmd_fmt = 0x00e0;
-	param.addr = 0x3fd2;
-	param.data = 0x0030;
 	param.cmd = RT5640_DSP_CMD_MW;
+	param.addr = 0x22fb;
+	param.data = 0x0000;
 	ret = rt5640_dsp_write(codec, &param);
 	if (ret < 0) {
-		dev_err(codec->dev,
-			"Failed to Power up LDO of Dsp: %d\n", ret);
-		goto rsm_err;
+		dev_err(codec->dev, "Fail to write Dsp: %d\n", ret);
 	}
+	snd_soc_write(codec, RT5640_DSP_CTRL3, 0x0400);
 
-	ret = snd_soc_update_bits(codec, RT5640_DSP_CTRL3,
-		RT5640_DSP_PD_PIN_MASK, RT5640_DSP_PD_PIN_LO);
-	if (ret < 0) {
-		dev_err(codec->dev, "Failed to power down DSP: %d\n", ret);
-		goto rsm_err;
-	}
-
-	return 0;
-
-rsm_err:
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(rt5640_dsp_suspend);
-
-int rt5640_dsp_resume(struct snd_soc_codec *codec)
-{
+	snd_soc_update_bits(codec, RT5640_GLB_CLK,
+				RT5640_SCLK_SRC_MASK, ret);
+	//snd_soc_update_bits(codec, RT5640_PWR_DIG2,
+	//	RT5640_PWR_I2S_DSP, 0);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(rt5640_dsp_resume);

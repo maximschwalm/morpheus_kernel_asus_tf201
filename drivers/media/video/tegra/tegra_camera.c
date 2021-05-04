@@ -60,7 +60,7 @@ struct tegra_camera_block {
 	bool is_enabled;
 };
 
-static struct tegra_camera_dev *p_cam_dev;
+//static struct tegra_camera_dev *p_cam_dev; //Ryant --
 /*
  * Declare and define two static variables to provide hint to
  * gr3d module
@@ -82,9 +82,11 @@ int is_tegra_camera_on(void)
 
 static int tegra_camera_enable_clk(struct tegra_camera_dev *dev)
 {
-	if(tegra3_get_project_id() != TEGRA3_PROJECT_TF201)
+	/* Ryant --
+	 if(tegra3_get_project_id() != TEGRA3_PROJECT_TF201)
 		tegra_pinmux_set_tristate(TEGRA_PINGROUP_CAM_MCLK, TEGRA_TRI_TRISTATE);
-
+	*/
+	printk("Ryant In %s\n",__func__);
 	clk_enable(dev->vi_clk);
 	clk_enable(dev->vi_sensor_clk);
 	clk_enable(dev->csus_clk);
@@ -116,15 +118,17 @@ static int tegra_camera_disable_clk(struct tegra_camera_dev *dev)
 	clk_disable(dev->vi_clk);
 	tegra_periph_reset_assert(dev->vi_clk);
 
-	if(tegra3_get_project_id() != TEGRA3_PROJECT_TF201)
+	/* Ryant --
+	 * if(tegra3_get_project_id() != TEGRA3_PROJECT_TF201)
 		tegra_pinmux_set_tristate(TEGRA_PINGROUP_CAM_MCLK, TEGRA_TRI_NORMAL);
-
+	*/
 	return 0;
 }
 
 static int tegra_camera_enable_emc(struct tegra_camera_dev *dev)
 {
 	int ret = tegra_emc_disable_eack();
+	printk("Ryant In %s\n",__func__);
 	clk_enable(dev->emc_clk);
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	clk_set_rate(dev->emc_clk, 300000000);
@@ -165,12 +169,12 @@ static int tegra_camera_clk_set_rate(struct tegra_camera_dev *dev)
 		break;
 	case TEGRA_CAMERA_VI_SENSOR_CLK:
 		clk = dev->vi_sensor_clk;
+		printk("%s: vi_sensor_clk set_rate", __func__);//Ryant
 		break;
 	case TEGRA_CAMERA_EMC_CLK:
 		clk = dev->emc_clk;
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
-		dev_dbg(dev->dev, "%s: emc_clk rate=%lu\n",
-			__func__, info->rate);
+		printk("%s: emc_clk rate=%lu\n", __func__, info->rate);
 		clk_set_rate(dev->emc_clk, info->rate);
 #endif
 		goto set_rate_end;
@@ -183,7 +187,7 @@ static int tegra_camera_clk_set_rate(struct tegra_camera_dev *dev)
 
 	clk_parent = clk_get_parent(clk);
 	parent_rate = clk_get_rate(clk_parent);
-	dev_dbg(dev->dev, "%s: clk_id=%d, parent_rate=%lu, clk_rate=%lu\n",
+	printk("%s: clk_id=%d, parent_rate=%lu, clk_rate=%lu\n",
 			__func__, info->clk_id, parent_rate, info->rate);
 	parent_div_rate = parent_rate;
 	parent_div_rate_pre = parent_rate;
@@ -198,7 +202,7 @@ static int tegra_camera_clk_set_rate(struct tegra_camera_dev *dev)
 		parent_div_rate = clk_round_rate(clk, parent_div_rate-1);
 	}
 
-	dev_dbg(dev->dev, "%s: set_rate=%lu",
+	printk("%s: set_rate=%lu",
 			__func__, parent_div_rate_pre);
 
 	clk_set_rate(clk, parent_div_rate_pre);
@@ -224,8 +228,7 @@ static int tegra_camera_clk_set_rate(struct tegra_camera_dev *dev)
 
 set_rate_end:
 	info->rate = clk_get_rate(clk);
-	dev_dbg(dev->dev, "%s: get_rate=%lu",
-			__func__, info->rate);
+	printk("%s: get_rate=%lu", __func__, info->rate);
 	return 0;
 
 }
@@ -234,7 +237,7 @@ static int tegra_camera_power_on(struct tegra_camera_dev *dev)
 {
 	int ret = 0;
 
-	dev_dbg(dev->dev, "%s++\n", __func__);
+	printk("%s++\n", __func__);
 
 	/* Enable external power */
 	if (dev->reg) {
@@ -263,7 +266,7 @@ static int tegra_camera_power_off(struct tegra_camera_dev *dev)
 {
 	int ret = 0;
 
-	dev_dbg(dev->dev, "%s++\n", __func__);
+	printk("%s++\n", __func__);
 
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	/* Powergate VE */
@@ -357,9 +360,10 @@ static int tegra_camera_open(struct inode *inode, struct file *file)
 
 	dev_info(dev->dev, "%s\n", __func__);
 
-	if (atomic_xchg(&dev->in_use, 1))
+	if (atomic_xchg(&dev->in_use, 1)){
+		printk("Ryant In %s BUSY\n",__func__);
 		return -EBUSY;
-
+	}
 	file->private_data = dev;
 
 	mutex_lock(&dev->tegra_camera_lock);
@@ -414,14 +418,14 @@ static const struct file_operations tegra_camera_fops = {
 	.unlocked_ioctl = tegra_camera_ioctl,
 	.release = tegra_camera_release,
 };
-
+/* //Ryant Add for debug
 int tegra_camera_mclk_on_off(int on)
 {
     if (!p_cam_dev) return -1;
 
     if (on){
-        printk("camera mclock on\n");
         clk_set_rate(p_cam_dev->csus_clk, 6000000);
+#if 0
         if ((tegra3_get_project_id()==TEGRA3_PROJECT_TF300T) ||
             (tegra3_get_project_id()==TEGRA3_PROJECT_TF300TG) ||
             (tegra3_get_project_id()==TEGRA3_PROJECT_TF300TL) ||
@@ -430,18 +434,20 @@ int tegra_camera_mclk_on_off(int on)
             (tegra3_get_project_id()==TEGRA3_PROJECT_ME301TL))
             clk_set_rate(p_cam_dev->vi_sensor_clk, 12000000);
         else
-            clk_set_rate(p_cam_dev->vi_sensor_clk, 24000000);
+#endif
+        clk_set_rate(p_cam_dev->vi_sensor_clk, 24000000);
         clk_enable(p_cam_dev->csus_clk);
         clk_enable(p_cam_dev->vi_sensor_clk);
     }
     else{
+        printk("jimmy camera mclock off\n");
         clk_disable(p_cam_dev->vi_sensor_clk);
         clk_disable(p_cam_dev->csus_clk);
     }
 printk("-%s\n",__FUNCTION__);
     return 0;
 }
-
+*/
 static int tegra_camera_clk_get(struct platform_device *pdev, const char *name,
 				struct clk **clk)
 {
@@ -502,7 +508,7 @@ static int tegra_camera_probe(struct platform_device *pdev)
 		}
 	}
 
-	regulator_set_voltage(dev->reg, 1200000, 1200000);
+	//regulator_set_voltage(dev->reg, 1200000, 1200000); //Ryant --
 
 	dev->misc_dev.minor = MISC_DYNAMIC_MINOR;
 	dev->misc_dev.name = TEGRA_CAMERA_NAME;
@@ -537,7 +543,7 @@ static int tegra_camera_probe(struct platform_device *pdev)
 
 	/* dev is set in order to restore in _remove */
 	platform_set_drvdata(pdev, dev);
-	p_cam_dev = dev;
+	//p_cam_dev = dev; //Ryant
 
 	return 0;
 
@@ -588,9 +594,10 @@ static int tegra_camera_suspend(struct platform_device *pdev, pm_message_t state
 	}
 	mutex_unlock(&dev->tegra_camera_lock);
 
-	if(tegra3_get_project_id() != TEGRA3_PROJECT_TF201)
+	/*Ryant --
+	 * if(tegra3_get_project_id() != TEGRA3_PROJECT_TF201)
 		tegra_pinmux_set_tristate(TEGRA_PINGROUP_CAM_MCLK, TEGRA_TRI_NORMAL);
-
+	*/
 	return ret;
 }
 

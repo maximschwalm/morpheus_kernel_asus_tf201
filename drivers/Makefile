@@ -69,6 +69,10 @@ obj-$(CONFIG_PARIDE) 		+= block/paride/
 obj-$(CONFIG_TC)		+= tc/
 obj-$(CONFIG_UWB)		+= uwb/
 obj-$(CONFIG_INPUT_ASUSEC)      += input/asusec/
+obj-$(CONFIG_USB_OTG_UTILS)	+= usb/
+obj-$(CONFIG_USB)		+= usb/
+obj-$(CONFIG_PCI)		+= usb/
+obj-$(CONFIG_USB_GADGET)	+= usb/
 obj-$(CONFIG_SERIO)		+= input/serio/
 obj-$(CONFIG_GAMEPORT)		+= input/gameport/
 obj-$(CONFIG_INPUT)		+= input/
@@ -79,10 +83,6 @@ obj-$(CONFIG_PPS)		+= pps/
 obj-$(CONFIG_PTP_1588_CLOCK)	+= ptp/
 obj-$(CONFIG_W1)		+= w1/
 obj-$(CONFIG_POWER_SUPPLY)	+= power/
-obj-$(CONFIG_USB_OTG_UTILS)	+= usb/
-obj-$(CONFIG_USB)		+= usb/
-obj-$(CONFIG_PCI)		+= usb/
-obj-$(CONFIG_USB_GADGET)	+= usb/
 obj-$(CONFIG_HWMON)		+= hwmon/
 obj-$(CONFIG_THERMAL)		+= thermal/
 obj-$(CONFIG_WATCHDOG)		+= watchdog/
@@ -133,6 +133,3 @@ obj-$(CONFIG_VIRT_DRIVERS)	+= virt/
 
 # ASUS customized RIL drivers
 obj-$(CONFIG_RIL)			+= ril/
-
-# ASUS GPS dongle driver
-obj-$(CONFIG_ASUS_GPS)		+= asus_gps/

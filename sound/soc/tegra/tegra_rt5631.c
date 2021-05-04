@@ -25,7 +25,7 @@
 #include <mach/board-cardhu-misc.h>
 #include <mach/tegra_asoc_pdata.h>
 
-#include "../drivers/input/asusec/asusdec.h"
+#include "../drivers/input/asusec/asuspec.h"
 #include "../gpio-names.h"
 #define DRV_NAME "tegra-snd-codec"
 

@@ -173,10 +173,15 @@
 #define CAM2_LDO_EN_GPIO			TEGRA_GPIO_PR7
 #define CAM3_LDO_EN_GPIO			TEGRA_GPIO_PS0
 #define OV14810_RESETN_GPIO			TEGRA_GPIO_PBB0
-
+#define CAM_WP_5M_R                             TEGRA_GPIO_PS5 //jimmy modified
 #define CAMERA_FLASH_SYNC_GPIO		TEGRA_GPIO_PBB3
 #define CAMERA_FLASH_MAX_TORCH_AMP	7
 #define CAMERA_FLASH_MAX_FLASH_AMP	7
+/* TF600T */
+#define VDD_1V8_GEN		TEGRA_GPIO_PBB4  //VDDIO_CAM1(1.8v)
+#define CAM1_LDO_EN_GPIO	TEGRA_GPIO_PR6   //VDD_VCM_CAM1(2.8v)
+#define AVDD_CAM1_EN            TEGRA_GPIO_PH1   //AVDD_CAM1 (2.7v)
+
 /* CAMERA RELATED GPIOs on TF201*/
 #define ISP_POWER_1V2_EN_GPIO       TEGRA_GPIO_PS3      //ISP_1V2_EN VDD_ISP_1V2
 #define ISP_POWER_RESET_GPIO        TEGRA_GPIO_PBB0     //CAM_RST_5M, RSTX
@@ -235,10 +240,6 @@ int cardhu_pm298_gpio_switch_regulator_init(void);
 int cardhu_pm298_regulator_init(void);
 int cardhu_pm299_gpio_switch_regulator_init(void);
 int cardhu_pm299_regulator_init(void);
-struct platform_device *tegra_cardhu_usb_utmip_host_register(void);
-void tegra_cardhu_usb_utmip_host_unregister(struct platform_device *pdev);
-struct platform_device *tegra_usb3_utmip_host_register(void);
-void tegra_usb3_utmip_host_unregister(struct platform_device *pdev);
 
 extern struct tegra_uart_platform_data cardhu_irda_pdata;
 
@@ -328,7 +329,7 @@ extern struct tegra_uart_platform_data cardhu_irda_pdata;
 /* Asus baseband GPIO addresses */
 #define BB_GPIO_VBAT_ON			TEGRA_GPIO_PC6  //MOD_VBAT_ON
 #define BB_GPIO_VBUS_ON			TEGRA_GPIO_PD2  //MOD_VBUS_ON
-#define BB_GPIO_SW_SEL			TEGRA_GPIO_PP1  //USB_SW_SEL
+//#define BB_GPIO_SW_SEL			TEGRA_GPIO_PP1  //USB_SW_SEL
 #define BB_GPIO_RESET_IND		TEGRA_GPIO_PEE1 //n_MOD_RST_IND
 #define BB_GPIO_SAR_DET			TEGRA_GPIO_PR3  //SAR_DET#_3G
 #define BB_GPIO_SIM_DET			TEGRA_GPIO_PW3  //n_SIM_CD

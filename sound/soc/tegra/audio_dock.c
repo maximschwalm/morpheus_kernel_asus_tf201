@@ -24,7 +24,7 @@
 #include <sound/core.h>
 #include <sound/soc.h>
 #include "../codecs/wm8903.h"
-#include "../drivers/input/asusec/asusdec.h"
+#include "../drivers/input/asusec/asuspec.h"
 #include <mach/board-cardhu-misc.h>
 #include <asm/gpio.h>
 #include "../gpio-names.h"
@@ -135,8 +135,14 @@ EXPORT_SYMBOL(audio_dock_in_out);
 
 void audio_dock_init(void)
 {
+
+        audio_codec = rt5640_audio_codec;
+
+
+/*
 	unsigned int project_info = 0;
 
+               
 	project_info = tegra3_get_project_id();
 
         switch(project_info){
@@ -156,7 +162,7 @@ void audio_dock_init(void)
 		default:
 			break;
 	}
-
+*/
 }
 
 EXPORT_SYMBOL(audio_dock_init);

@@ -585,7 +585,7 @@ FIXED_REG(22, en_vbrtr,		en_vbrtr,	FIXED_SUPPLY(en_3v3_sys),	0,      0,      PMU
 FIXED_REG(4, en_vdd_bl_pm269,		en_vdd_bl,		NULL, 				0,      0,      TEGRA_GPIO_PH3,	true,	1, 5000);
 FIXED_REG(6, en_vdd_pnl1_pm269,		en_vdd_pnl1,		FIXED_SUPPLY(en_3v3_sys), 	0,      0,      TEGRA_GPIO_PW1,	true,	1, 3300);
 FIXED_REG(9, en_3v3_fuse_pm269,		en_3v3_fuse,		FIXED_SUPPLY(en_3v3_sys), 	0,      0,      TEGRA_GPIO_PC1,	true,	0, 3300);
-FIXED_REG(11, en_vdd_sdmmc1_pm269,	en_vdd_sdmmc1,		FIXED_SUPPLY(en_3v3_sys), 	0,      0,      TEGRA_GPIO_PP1,	true,	1, 3300);
+//FIXED_REG(11, en_vdd_sdmmc1_pm269,	en_vdd_sdmmc1,		FIXED_SUPPLY(en_3v3_sys), 	0,      0,      TEGRA_GPIO_PP1,	true,	1, 3300);
 FIXED_REG(12, en_3v3_pex_hvdd_pm269,	en_3v3_pex_hvdd,	FIXED_SUPPLY(en_3v3_sys), 	0,      0,      TEGRA_GPIO_PC6,	true,	0, 3300);
 
 /* Specific to E1187/E1186/E1256 */
@@ -636,7 +636,6 @@ FIXED_REG_OD(17, en_vddio_vid_oc_e118x,	en_vddio_vid_oc,	FIXED_SUPPLY(dis_5v_swi
 	ADD_FIXED_REG(en_vdd_com),		\
 	ADD_FIXED_REG(en_3v3_fuse_pm269),	\
 	ADD_FIXED_REG(en_3v3_emmc),		\
-	ADD_FIXED_REG(en_vdd_sdmmc1_pm269),	\
 	ADD_FIXED_REG(en_3v3_pex_hvdd_pm269),	\
 	ADD_FIXED_REG(en_1v8_cam),		\
 	ADD_FIXED_REG(dis_5v_switch_e118x),	\

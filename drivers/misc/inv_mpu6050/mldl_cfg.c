@@ -507,35 +507,33 @@ static int mpu60xx_pwr_mgmt(struct mldl_cfg *mldl_cfg,
 	unsigned char data;
 	unsigned char pwr_mgmt[2];
 	unsigned char pwr_mgmt_prev[2];
-	unsigned char prod_ver = 0x00;
-	int reset_counter = 0;
 	int result;
 	int sleep = !(sensors & (INV_THREE_AXIS_GYRO | INV_THREE_AXIS_ACCEL
 				| INV_DMP_PROCESSOR));
 
 	if (reset) {
-		/* reset: retry 25 times at most, may take 15 ms ~ 375 ms */
-		while (++reset_counter <= 25) {
-			MPL_LOGI("Reset MPU6050 B1, trial: %2d\n", reset_counter);
+		MPL_LOGI("Reset MPU6050 B1\n");
+		// check IC is sleeping or not
+		result = inv_mpu6050_serial_read(mlsl_handle, mldl_cfg->mpu_chip_info->addr,
+			MPUREG_PWR_MGMT_1, 1, &data);
+		if(data & (REG_PWR_MGMT_1_SLEEP_ON)){
+			MPL_LOGI("read MPUREG_PWR_MGMT_1 bit: 0x%02lx, wake up IC \n",data);
+			data &= (~REG_PWR_MGMT_1_SLEEP_ON);
 			result = inv_mpu6050_serial_single_write(
-					mlsl_handle, mldl_cfg->mpu_chip_info->addr,
-					MPUREG_PWR_MGMT_1, BIT_H_RESET);
-			if (result) {
-				LOG_RESULT_LOCATION(result);
-				return result;
-			}
-			msleep(15);
-			result = inv_mpu6050_serial_read(mlsl_handle, mldl_cfg->mpu_chip_info->addr,
-					MPUREG_PRODUCT_ID, 1, &prod_ver);
-			if (result) {
-				LOG_RESULT_LOCATION(result);
-				return result;
-			}
-			if (0 != prod_ver) {
-				mldl_cfg->inv_mpu_state->status &= ~MPU_GYRO_IS_BYPASSED;
-				break;
-			}
+	                        mlsl_handle, mldl_cfg->mpu_chip_info->addr,
+	                        MPUREG_PWR_MGMT_1, data);
+			msleep(5);
 		}
+
+		result = inv_mpu6050_serial_single_write(
+			mlsl_handle, mldl_cfg->mpu_chip_info->addr,
+			MPUREG_PWR_MGMT_1, BIT_H_RESET);
+		if (result) {
+			LOG_RESULT_LOCATION(result);
+			return result;
+		}
+		mldl_cfg->inv_mpu_state->status &= ~MPU_GYRO_IS_BYPASSED;
+		msleep(15);
 	}
 
 	/* NOTE : reading both PWR_MGMT_1 and PWR_MGMT_2 for efficiency because
