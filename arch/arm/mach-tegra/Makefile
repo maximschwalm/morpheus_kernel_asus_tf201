@@ -163,16 +163,12 @@ obj-${CONFIG_MACH_WHISTLER}             += board-whistler-memory.o
 
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu.o
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu-kbc.o
-obj-${CONFIG_MACH_CARDHU}               += board-cardhu-irda.o
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu-panel.o
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu-pinmux.o
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu-power.o
-obj-${CONFIG_MACH_CARDHU}               += board-cardhu-pm298-power-rails.o
-obj-${CONFIG_MACH_CARDHU}               += board-cardhu-pm299-power-rails.o
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu-sdhci.o
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu-sensors.o
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu-memory.o
-obj-${CONFIG_MACH_CARDHU}               += board-cardhu-powermon.o
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu-misc.o
 obj-${CONFIG_MACH_CARDHU}               += vibrator.o
 
