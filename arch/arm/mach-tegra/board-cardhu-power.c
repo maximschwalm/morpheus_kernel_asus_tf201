@@ -1043,53 +1043,8 @@ int __init cardhu_fixed_regulator_init(void)
 	tegra_get_pmu_board_info(&pmu_board_info);
 	tegra_get_display_board_info(&display_board_info);
 
-	if (pmu_board_info.board_id == BOARD_PMU_PM298)
-		return cardhu_pm298_gpio_switch_regulator_init();
-
-	if (pmu_board_info.board_id == BOARD_PMU_PM299)
-		return cardhu_pm299_gpio_switch_regulator_init();
-
 	switch (board_info.board_id) {
-	case BOARD_E1198:
-		if (board_info.fab <= BOARD_FAB_A01) {
-			nfixreg_devs = ARRAY_SIZE(fixed_reg_devs_e1198_base);
-			fixed_reg_devs = fixed_reg_devs_e1198_base;
-		} else {
-			nfixreg_devs = ARRAY_SIZE(fixed_reg_devs_e1198_a02);
-			fixed_reg_devs = fixed_reg_devs_e1198_a02;
-		}
-		break;
-
-	case BOARD_E1291:
-		if (board_info.fab == BOARD_FAB_A03) {
-			nfixreg_devs = ARRAY_SIZE(fixed_reg_devs_e1291_a03);
-			fixed_reg_devs = fixed_reg_devs_e1291_a03;
-		} else if ((board_info.fab == BOARD_FAB_A04) ||
-				(board_info.fab == BOARD_FAB_A05) ||
-				(board_info.fab == BOARD_FAB_A07)) {
-			nfixreg_devs = ARRAY_SIZE(fixed_reg_devs_e1291_a04);
-			fixed_reg_devs = fixed_reg_devs_e1291_a04;
-		} else {
-			nfixreg_devs = ARRAY_SIZE(fixed_reg_devs_e1198_base);
-			fixed_reg_devs = fixed_reg_devs_e1198_base;
-		}
-		break;
-
-	case BOARD_PM311:
-	case BOARD_PM305:
-		nfixreg_devs = ARRAY_SIZE(fixed_reg_devs_pm311);
-		fixed_reg_devs = fixed_reg_devs_pm311;
-		if (display_board_info.board_id == BOARD_DISPLAY_PM313) {
-			nfixreg_devs = ARRAY_SIZE(fixed_reg_devs_pm311_pm313);
-			fixed_reg_devs = fixed_reg_devs_pm311_pm313;
-		} else if (is_display_board_dsi(display_board_info.board_id)) {
-			nfixreg_devs = ARRAY_SIZE(fixed_reg_devs_pm311_dsi);
-			fixed_reg_devs = fixed_reg_devs_pm311_dsi;
-		}
-		break;
-
 	case BOARD_PM269:
-	case BOARD_E1257:
 		nfixreg_devs = ARRAY_SIZE(fixed_reg_devs_pm269);
 		fixed_reg_devs = fixed_reg_devs_pm269;
 		if (display_board_info.board_id == BOARD_DISPLAY_PM313) {
@@ -1111,19 +1066,6 @@ int __init cardhu_fixed_regulator_init(void)
 				fixed_reg_devs = fixed_reg_devs_pm269_me301;
 			}
 
-		}
-		break;
-
-	default:
-		if (display_board_info.board_id == BOARD_DISPLAY_PM313) {
-			nfixreg_devs = ARRAY_SIZE(fixed_reg_devs_e118x_pm313);
-			fixed_reg_devs = fixed_reg_devs_e118x_pm313;
-		} else if (is_display_board_dsi(display_board_info.board_id)) {
-			nfixreg_devs = ARRAY_SIZE(fixed_reg_devs_e118x_dsi);
-			fixed_reg_devs = fixed_reg_devs_e118x_dsi;
-		} else {
-			nfixreg_devs = ARRAY_SIZE(fixed_reg_devs_e118x);
-			fixed_reg_devs = fixed_reg_devs_e118x;
 		}
 		break;
 	}
@@ -1238,7 +1180,6 @@ int __init cardhu_suspend_init(void)
 }
 
 #ifdef CONFIG_TEGRA_EDP_LIMITS
-
 int __init cardhu_edp_init(void)
 {
 
@@ -1252,25 +1193,17 @@ int __init cardhu_edp_init(void)
 	case TEGRA3_PROJECT_TF300T:
 	case TEGRA3_PROJECT_TF300TG:
 	case TEGRA3_PROJECT_TF300TL:
-	case TEGRA3_PROJECT_TF500T:
-	case TEGRA3_PROJECT_ME301T:
-	case TEGRA3_PROJECT_ME301TL:
 		current_mA = 6000;
 		break;
-	case TEGRA3_PROJECT_ME570T:
-		current_mA = 8200;
-		break;
 	case TEGRA3_PROJECT_TF700T:
-	case TEGRA3_PROJECT_P1801:
 		current_mA = 10000;
 		break;
 	default:
 		pr_info("%s: cannot match edp limit\n", __func__);
 		break;
-
 	}
 
-	pr_info("%s : use asus edp policy with %u mA\n", __func__, current_mA);
+	pr_info("%s: use asus edp policy with %u mA\n", __func__, current_mA);
 
 	tegra_init_cpu_edp_limits(current_mA);
 
@@ -1278,39 +1211,8 @@ int __init cardhu_edp_init(void)
 }
 #endif
 
-/*static char *cardhu_battery[] = {
-	"bq27510-0",
-};
-
-static struct gpio_charger_platform_data cardhu_charger_pdata = {
-	.name = "ac",
-	.type = POWER_SUPPLY_TYPE_MAINS,
-	.gpio = AC_PRESENT_GPIO,
-	.gpio_active_low = 0,
-	.supplied_to = cardhu_battery,
-	.num_supplicants = ARRAY_SIZE(cardhu_battery),
-};
-
-static struct platform_device cardhu_charger_device = {
-	.name = "gpio-charger",
-	.dev = {
-		.platform_data = &cardhu_charger_pdata,
-	},
-};
-
-static int __init cardhu_charger_late_init(void)
-{
-	if (!machine_is_cardhu())
-		return 0;
-
-	platform_device_register(&cardhu_charger_device);
-	return 0;
-}
-
-late_initcall(cardhu_charger_late_init);*/
-
-unsigned int boot_reason=0;
-void tegra_booting_info(void )
+unsigned int boot_reason = 0;
+void tegra_booting_info(void)
 {
 	static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
 	unsigned int reg;
