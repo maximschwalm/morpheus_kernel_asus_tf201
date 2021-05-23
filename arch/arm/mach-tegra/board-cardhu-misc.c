@@ -69,20 +69,6 @@ static const struct pins cardhu_extended_projectid_pins[] = {
 	{TEGRA_GPIO_PK4, TEGRA_PINGROUP_GMI_CS3_N, "PROJECT_ID3", true, false},
 };
 
-static const char *tegra3_project_name[TEGRA3_PROJECT_MAX] = {
-	[TEGRA3_PROJECT_TF201] = "TF201",
-	[TEGRA3_PROJECT_P1801] = "P1801",
-	[TEGRA3_PROJECT_TF300T] = "TF300T",
-	[TEGRA3_PROJECT_TF300TG] = "TF300TG",
-	[TEGRA3_PROJECT_TF700T] = "TF700T",
-	[TEGRA3_PROJECT_TF300TL] = "TF300TL",
-	[TEGRA3_PROJECT_EXTENSION] = "Extension",
-	[TEGRA3_PROJECT_TF500T] = "TF500T",
-	[TEGRA3_PROJECT_ME301T] = "ME301T",
-	[TEGRA3_PROJECT_ME301TL] = "ME301TL",
-	[TEGRA3_PROJECT_ME570T] = "ME570T",
-};
-
 static unsigned int tegra3_project_name_index = TEGRA3_PROJECT_INVALID;
 static bool tegra3_misc_enabled = false;
 
@@ -102,36 +88,7 @@ static int __init tegra3_productid_setup(char *id)
 					? index : TEGRA3_PROJECT_INVALID;
 	return 0;
 }
-
 early_param("androidboot.productid", tegra3_productid_setup);
-
-/* Deprecated function */
-const char *tegra3_get_project_name(void)
-{
-	unsigned int project_id = tegra3_project_name_index;
-
-	if (tegra3_misc_enabled) {
-		project_id = HW_DRF_VAL(TEGRA3_DEVKIT, MISC_HW,
-
-						PROJECT, cardhu_pcbid);
-		if (project_id == TEGRA3_PROJECT_EXTENSION)
-			project_id = 8 + HW_DRF_VAL(TEGRA3_DEVKIT, MISC_HW,
-				EXTENDED_PROJECT, cardhu_extended_projectid);
-
-		/* WARN if project id was not matched with PCBID */
-		WARN_ONCE(project_id != tegra3_project_name_index,
-			"[MISC]: project ID in kernel cmdline was not matched"
-			"with PCBID\n");
-	}
-	else {
-		pr_info("[MISC]: adopt kernel cmdline prior to %s ready.\n",
-				__func__);
-	}
-
-	return (project_id < TEGRA3_PROJECT_MAX) ?
-		tegra3_project_name[project_id] : "unknown";
-}
-EXPORT_SYMBOL(tegra3_get_project_name);
 
 unsigned int tegra3_get_project_id(void)
 {
@@ -164,117 +121,61 @@ unsigned int tegra3_query_touch_module_pcbid(void)
 {
 	unsigned int touch_pcbid = 0;
 	unsigned int project = tegra3_get_project_id();
-	unsigned int ret = -1;
 
 	/* Check if running target platform */
 	if ((project == TEGRA3_PROJECT_TF300T) ||
 		(project == TEGRA3_PROJECT_TF300TG) ||
-		(project == TEGRA3_PROJECT_TF300TL)) {
-		pr_err("[MISC]: %s is not supported on %02x.\n", __func__,
-			tegra3_get_project_id());
-		return ret;
-	}
+		(project == TEGRA3_PROJECT_TF300TL))
+		return -ENODEV;
 
 	/* Fetch PCB_ID[2] and PCB_ID[6] and recompose it */
 	touch_pcbid = (HW_DRF_VAL(TEGRA3_DEVKIT, MISC_HW, TOUCHL, cardhu_pcbid)) +
 		(HW_DRF_VAL(TEGRA3_DEVKIT, MISC_HW, TOUCHH, cardhu_pcbid) << 1);
 
-	switch (project) {
-	case TEGRA3_PROJECT_TF201:
-		ret = touch_pcbid;
-		break;
-	case TEGRA3_PROJECT_TF700T:
-		/* Reserve PCB_ID[2] for touch panel identification */
-		ret = touch_pcbid & 0x1;
-		break;
-	default:
-		ret = -1;
-	}
+	/* Reserve PCB_ID[2] for touch panel identification */
+	if (project == TEGRA3_PROJECT_TF700T)
+		touch_pcbid = touch_pcbid & 0x1;
 
-	return ret;
+	return touch_pcbid;
 }
 EXPORT_SYMBOL(tegra3_query_touch_module_pcbid);
 
 unsigned int tegra3_query_audio_codec_pcbid(void)
 {
-	unsigned int codec_pcbid = 0;
 	unsigned int project = tegra3_get_project_id();
-	unsigned int ret = -1;
 
 	/* Check if running target platform */
 	if ((project == TEGRA3_PROJECT_TF201) ||
-		(project == TEGRA3_PROJECT_TF700T)) {
-		pr_err("[MISC]: %s is not supported on %02x.\n", __func__,
-			tegra3_get_project_id());
-		return ret;
-	}
+		(project == TEGRA3_PROJECT_TF700T))
+		return -ENODEV;
 
-	codec_pcbid = HW_DRF_VAL(TEGRA3_DEVKIT, MISC_HW, ACODEC, cardhu_pcbid);
-
-	if ((project == TEGRA3_PROJECT_TF300T) ||
-		(project == TEGRA3_PROJECT_TF300TG) ||
-		(project == TEGRA3_PROJECT_TF300TL)) {
-		ret = codec_pcbid;
-	}
-
-	return ret;
+	return HW_DRF_VAL(TEGRA3_DEVKIT, MISC_HW, ACODEC, cardhu_pcbid);
 }
 EXPORT_SYMBOL(tegra3_query_audio_codec_pcbid);
 
 unsigned int tegra3_query_pcba_revision_pcbid(void)
 {
 	unsigned int project = tegra3_get_project_id();
-	unsigned int ret = -1;
 
 	/* Check if running target platform */
-	if (project != TEGRA3_PROJECT_TF700T) {
-		pr_err("[MISC]: %s is not supported on %02x.\n", __func__,
-			tegra3_get_project_id());
-		return ret;
-	}
+	if (project != TEGRA3_PROJECT_TF700T)
+		return -ENODEV;
 
-	ret = HW_DRF_VAL(TEGRA3_DEVKIT, MISC_HW, REVISION, cardhu_pcbid);
-
-	return ret;
+	return HW_DRF_VAL(TEGRA3_DEVKIT, MISC_HW, REVISION, cardhu_pcbid);
 }
 EXPORT_SYMBOL(tegra3_query_pcba_revision_pcbid);
 
 unsigned int tegra3_query_wifi_module_pcbid(void)
 {
-	unsigned int wifi_pcbid = 0;
 	unsigned int project = tegra3_get_project_id();
-	unsigned int ret = -1;
 
 	/* Check if running target platform is valid */
-	if (project == TEGRA3_PROJECT_INVALID) {
-		pr_err("[MISC]: %s is not supported on %02x.\n", __func__,
-			tegra3_get_project_id());
-		return ret;
-	}
+	if (project == TEGRA3_PROJECT_INVALID)
+		return -ENODEV;
 
-	wifi_pcbid = HW_DRF_VAL(TEGRA3_DEVKIT, MISC_HW, WIFI, cardhu_pcbid);
-	ret = wifi_pcbid;
-
-	return ret;
+	return HW_DRF_VAL(TEGRA3_DEVKIT, MISC_HW, WIFI, cardhu_pcbid);
 }
 EXPORT_SYMBOL(tegra3_query_wifi_module_pcbid);
-
-unsigned int tegra3_query_nfc_module(void)
-{
-	unsigned int nfc_pcbid = 0;
-	unsigned int project = tegra3_get_project_id();
-	unsigned int ret = TEGRA3_NFC_NONE;
-
-	/* Check if running target platform is valid */
-	if (project == TEGRA3_PROJECT_ME570T) {
-		nfc_pcbid = HW_DRF_VAL(TEGRA3_DEVKIT, MISC_HW, NFC,
-			cardhu_extended_pcbid);
-		ret = nfc_pcbid;
-	}
-
-	return ret;
-}
-EXPORT_SYMBOL(tegra3_query_nfc_module);
 
 static ssize_t cardhu_chipid_show(struct kobject *kobj,
 	struct kobj_attribute *attr, char *buf)
@@ -320,36 +221,14 @@ static ssize_t cardhu_projectid_show(struct kobject *kobj,
         return (s - buf);
 }
 
-static ssize_t cardhu_projectname_show(struct kobject *kobj,
-        struct kobj_attribute *attr, char *buf)
-{
-        char *s = buf;
-
-        s += sprintf(s, "%s\n", tegra3_get_project_name());
-        return (s - buf);
-}
-
-static ssize_t cardhu_nfc_show(struct kobject *kobj,
-        struct kobj_attribute *attr, char *buf)
-{
-        char *s = buf;
-
-        s += sprintf(s, "%x\n", tegra3_query_nfc_module());
-        return (s - buf);
-}
-
 CARDHU_MISC_ATTR(cardhu_chipid);
 CARDHU_MISC_ATTR(cardhu_pcbid);
 CARDHU_MISC_ATTR(cardhu_projectid);
-CARDHU_MISC_ATTR(cardhu_projectname);
-CARDHU_MISC_ATTR(cardhu_nfc);
 
 static struct attribute *attr_list[] = {
 	&cardhu_chipid_attr.attr,
 	&cardhu_pcbid_attr.attr,
 	&cardhu_projectid_attr.attr,
-	&cardhu_projectname_attr.attr,
-	&cardhu_nfc_attr.attr,
 	NULL,
 };
 
@@ -428,7 +307,6 @@ static void board_pins_pulldown(
 	}
 }
 
-
 int __init cardhu_misc_init(unsigned long long uid)
 {
 	int ret = 0;
@@ -443,10 +321,10 @@ int __init cardhu_misc_init(unsigned long long uid)
 	// create a platform device
 	cardhu_misc_device = platform_device_alloc("cardhu_misc", -1);
 
-        if (!cardhu_misc_device) {
+	if (!cardhu_misc_device) {
 		ret = -ENOMEM;
 		goto fail_platform_device;
-        }
+	}
 
 	// add a platform device to device hierarchy
 	ret = platform_device_add(cardhu_misc_device);
