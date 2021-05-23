@@ -37,9 +37,8 @@
 #define CARDHU_WLAN_PWR	TEGRA_GPIO_PD4
 #define CARDHU_WLAN_RST	TEGRA_GPIO_PD3
 #define CARDHU_WLAN_WOW	TEGRA_GPIO_PO4
+
 #define CARDHU_SD_CD TEGRA_GPIO_PI5
-#define CARDHU_SD_WP TEGRA_GPIO_PT3
-#define PM269_SD_WP -1
 
 static void (*wifi_status_cb)(int card_present, void *dev_id);
 static void *wifi_status_cb_devid;
@@ -69,15 +68,6 @@ static struct platform_device broadcom_wifi_device = {
 	.id		= 1,
 	.num_resources	= 1,
 	.resource	= wifi_resource,
-	.dev		= {
-		.platform_data = &cardhu_wifi_control,
-	},
-};
-
-static struct platform_device marvell_wifi_device = {
-	.name		= "mrvl8797_wlan",
-	.id		= 1,
-	.num_resources	= 0,
 	.dev		= {
 		.platform_data = &cardhu_wifi_control,
 	},
@@ -166,7 +156,7 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data2 = {
 
 static struct tegra_sdhci_platform_data tegra_sdhci_platform_data0 = {
 	.cd_gpio = CARDHU_SD_CD,
-	.wp_gpio = CARDHU_SD_WP,
+	.wp_gpio = -1,
 	.power_gpio = -1,
 	.tap_delay = 0x0F,
 /*	.is_voltage_switch_supported = true,
@@ -265,10 +255,12 @@ static int cardhu_wifi_power(int on)
 		tegra_io_dpd_disable(sd_dpd);
 		mutex_unlock(&sd_dpd->delay_lock);
 	}
+
 	gpio_set_value(CARDHU_WLAN_PWR, on);
 	mdelay(100);
 	gpio_set_value(CARDHU_WLAN_RST, on);
 	mdelay(200);
+
 	if (sd_dpd) {
 		mutex_lock(&sd_dpd->delay_lock);
 		tegra_io_dpd_enable(sd_dpd);
@@ -287,7 +279,6 @@ static int cardhu_wifi_reset(int on)
 static int __init cardhu_wifi_init(void)
 {
 	int rc;
-	int commchip_id = tegra_get_commchip_id();
 
 	rc = gpio_request(CARDHU_WLAN_PWR, "wlan_power");
 	if (rc)
@@ -302,17 +293,14 @@ static int __init cardhu_wifi_init(void)
 	rc = gpio_direction_output(CARDHU_WLAN_PWR, 0);
 	if (rc)
 		pr_err("WLAN_PWR gpio direction configuration failed:%d\n", rc);
-	gpio_direction_output(CARDHU_WLAN_RST, 0);
+	rc = gpio_direction_output(CARDHU_WLAN_RST, 0);
 	if (rc)
 		pr_err("WLAN_RST gpio direction configuration failed:%d\n", rc);
 	rc = gpio_direction_input(CARDHU_WLAN_WOW);
 	if (rc)
 		pr_err("WLAN_WOW gpio direction configuration failed:%d\n", rc);
 
-	if (commchip_id == COMMCHIP_MARVELL_SD8797)
-		platform_device_register(&marvell_wifi_device);
-	else
-		platform_device_register(&broadcom_wifi_device);
+	platform_device_register(&broadcom_wifi_device);
 
 	return 0;
 }
@@ -333,15 +321,6 @@ subsys_initcall_sync(cardhu_wifi_prepower);
 
 int __init cardhu_sdhci_init(void)
 {
-	struct board_info board_info;
-	tegra_get_board_info(&board_info);
-	if ((board_info.board_id == BOARD_PM269) ||
-		(board_info.board_id == BOARD_E1257) ||
-		(board_info.board_id == BOARD_PM305) ||
-		(board_info.board_id == BOARD_PM311)) {
-			tegra_sdhci_platform_data0.wp_gpio = PM269_SD_WP;
-	}
-
 	platform_device_register(&tegra_sdhci_device3);
 	platform_device_register(&tegra_sdhci_device2);
 	platform_device_register(&tegra_sdhci_device0);
